@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+websockets
+aiohttp
+jinja2
+python-dotenv
+numpy
+requests
+resemblyzer
+torchaudio
