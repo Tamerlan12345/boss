@@ -132,7 +132,7 @@ async def proxy_create_session(request: Request):
 
     try:
         resp = requests.post(
-            "https://api.heygen.com/v2/streaming/new",
+            "https://api.heygen.com/v1/streaming.new",
             headers=get_auth_headers(token),
             json={
                 "quality": data.get("quality", "medium"),
@@ -159,7 +159,7 @@ async def proxy_start_session(request: Request):
     token = data.get("token")
     try:
         resp = requests.post(
-            "https://api.heygen.com/v2/streaming/start",
+            "https://api.heygen.com/v1/streaming.start",
             headers=get_auth_headers(token),
             json={
                 "session_id": data.get("session_id"),
@@ -178,7 +178,7 @@ async def proxy_ice(request: Request):
     token = data.get("token")
     try:
         resp = requests.post(
-            "https://api.heygen.com/v2/streaming/ice",
+            "https://api.heygen.com/v1/streaming.ice",
             headers=get_auth_headers(token),
             json={
                 "session_id": data.get("session_id"),
@@ -198,7 +198,7 @@ async def proxy_task(request: Request):
     token = data.get("token")
     try:
         resp = requests.post(
-            "https://api.heygen.com/v2/streaming/task",
+            "https://api.heygen.com/v1/streaming.task",
             headers=get_auth_headers(token),
             json={
                 "session_id": data.get("session_id"),
@@ -217,7 +217,7 @@ async def proxy_stop(request: Request):
     token = data.get("token")
     try:
         resp = requests.post(
-            "https://api.heygen.com/v2/streaming/stop",
+            "https://api.heygen.com/v1/streaming.stop",
             headers=get_auth_headers(token),
             json={
                 "session_id": data.get("session_id")
