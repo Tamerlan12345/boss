@@ -95,16 +95,15 @@ class HeyGenAvatar {
     }
 
     async createSession(token) {
-        const response = await fetch('https://api.heygen.com/v2/streaming/new', {
+        // ИЗМЕНЕНО: Запрос на наш сервер, а не на api.heygen.com
+        const response = await fetch('/heygen/session/create', {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                token: token, // Передаем токен серверу
                 quality: 'medium',
                 avatar_name: activeAvatarId,
-                voice: { voice_id: activeVoiceId }
+                voice_id: activeVoiceId
             })
         });
         const data = await response.json();
@@ -131,13 +130,11 @@ class HeyGenAvatar {
 
             this.peerConnection.onicecandidate = async (event) => {
                 if (event.candidate) {
-                    await fetch('https://api.heygen.com/v2/streaming/ice', {
+                    await fetch('/heygen/ice', { // ИЗМЕНЕНО
                         method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.token}`,
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            token: this.token,
                             session_id: this.sessionId,
                             candidate: event.candidate
                         })
@@ -149,13 +146,11 @@ class HeyGenAvatar {
             const localSdp = await this.peerConnection.createAnswer();
             await this.peerConnection.setLocalDescription(localSdp);
 
-            await fetch('https://api.heygen.com/v2/streaming/start', {
+            await fetch('/heygen/session/start', { // ИЗМЕНЕНО
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    token: this.token,
                     session_id: this.sessionId,
                     sdp: localSdp
                 })
@@ -172,13 +167,11 @@ class HeyGenAvatar {
     async speak(text) {
         if (!this.sessionId) return;
         try {
-            await fetch('https://api.heygen.com/v2/streaming/task', {
+            await fetch('/heygen/task', { // ИЗМЕНЕНО
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    token: this.token,
                     session_id: this.sessionId,
                     text: text
                 })
@@ -192,13 +185,11 @@ class HeyGenAvatar {
     async stopSession() {
         if (!this.sessionId || !this.token) return;
         try {
-            await fetch('https://api.heygen.com/v2/streaming/stop', {
+            await fetch('/heygen/session/stop', { // ИЗМЕНЕНО
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    token: this.token,
                     session_id: this.sessionId
                 })
             });
