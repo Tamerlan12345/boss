@@ -2,6 +2,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 import uvicorn
 import os
 import requests
@@ -15,6 +17,26 @@ from resemblyzer import VoiceEncoder
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class SessionRequest(BaseModel):
+    quality: str = "medium"
+    avatar_name: str
+    voice_id: str
+
+class StartSessionRequest(BaseModel):
+    session_id: str
+    sdp: Dict[str, Any]
+
+class IceCandidateRequest(BaseModel):
+    session_id: str
+    candidate: Dict[str, Any]
+
+class TaskRequest(BaseModel):
+    session_id: str
+    text: str
+
+class StopSessionRequest(BaseModel):
+    session_id: str
 
 app = FastAPI()
 
@@ -93,6 +115,109 @@ def get_heygen_voices():
         return response.json()
     except Exception as e:
         logger.error(f"Failed to get HeyGen voices: {e}")
+        return {"error": str(e)}
+
+# Вспомогательная функция для заголовков
+def get_auth_headers(token: str):
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+@app.post("/heygen/session/create")
+async def proxy_create_session(request: Request):
+    data = await request.json()
+    # Клиент должен прислать token в теле или мы получаем его тут
+    token = data.get("token")
+
+    try:
+        resp = requests.post(
+            "https://api.heygen.com/v2/streaming/new",
+            headers=get_auth_headers(token),
+            json={
+                "quality": data.get("quality", "medium"),
+                "avatar_name": data.get("avatar_name"),
+                "voice": {"voice_id": data.get("voice_id")}
+            }
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        logger.error(f"HeyGen Create Error: {e}")
+        return {"error": str(e)}
+
+@app.post("/heygen/session/start")
+async def proxy_start_session(request: Request):
+    data = await request.json()
+    token = data.get("token")
+    try:
+        resp = requests.post(
+            "https://api.heygen.com/v2/streaming/start",
+            headers=get_auth_headers(token),
+            json={
+                "session_id": data.get("session_id"),
+                "sdp": data.get("sdp")
+            }
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        logger.error(f"HeyGen Start Error: {e}")
+        return {"error": str(e)}
+
+@app.post("/heygen/ice")
+async def proxy_ice(request: Request):
+    data = await request.json()
+    token = data.get("token")
+    try:
+        resp = requests.post(
+            "https://api.heygen.com/v2/streaming/ice",
+            headers=get_auth_headers(token),
+            json={
+                "session_id": data.get("session_id"),
+                "candidate": data.get("candidate")
+            }
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        # ICE ошибки часто не критичны, но логируем
+        logger.error(f"HeyGen ICE Error: {e}")
+        return {"error": str(e)}
+
+@app.post("/heygen/task")
+async def proxy_task(request: Request):
+    data = await request.json()
+    token = data.get("token")
+    try:
+        resp = requests.post(
+            "https://api.heygen.com/v2/streaming/task",
+            headers=get_auth_headers(token),
+            json={
+                "session_id": data.get("session_id"),
+                "text": data.get("text")
+            }
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        logger.error(f"HeyGen Task Error: {e}")
+        return {"error": str(e)}
+
+@app.post("/heygen/session/stop")
+async def proxy_stop(request: Request):
+    data = await request.json()
+    token = data.get("token")
+    try:
+        resp = requests.post(
+            "https://api.heygen.com/v2/streaming/stop",
+            headers=get_auth_headers(token),
+            json={
+                "session_id": data.get("session_id")
+            }
+        )
+        return resp.json()
+    except Exception as e:
         return {"error": str(e)}
 
 @app.websocket("/ws")
