@@ -17,8 +17,67 @@ function log(message) {
 }
 
 // HeyGen Avatar Logic
-const AVATAR_ID = 'da4a68297f26487a95078864c39c55b5'; // Male Avatar (Tyler)
-const VOICE_ID = '132a2651478f44b2a8bb7492c34cb623'; // Male Voice
+let activeAvatarId = 'da4a68297f26487a95078864c39c55b5'; // Male Avatar (Tyler)
+let activeVoiceId = '132a2651478f44b2a8bb7492c34cb623'; // Male Voice
+
+async function checkAvailability() {
+    try {
+        log('Checking Avatar availability...');
+
+        // Check Avatars
+        const avatarsResp = await fetch('/avatars');
+        if (avatarsResp.ok) {
+            const avatarsData = await avatarsResp.json();
+            const avatars = avatarsData.data ? avatarsData.data.avatars : (avatarsData.avatars || []);
+
+            const avatar = avatars.find(a => a.avatar_id === activeAvatarId);
+            if (avatar) {
+                log(`Avatar ${activeAvatarId} is available: ${avatar.name}`);
+            } else {
+                log(`WARNING: Default Avatar ${activeAvatarId} not found in available list!`);
+                if (avatars.length > 0) {
+                    activeAvatarId = avatars[0].avatar_id;
+                    log(`Switched to available avatar: ${activeAvatarId} (${avatars[0].name})`);
+                }
+            }
+        } else {
+            log('Failed to fetch avatars list');
+        }
+
+        // Check Voices
+        const voicesResp = await fetch('/voices');
+        if (voicesResp.ok) {
+            const voicesData = await voicesResp.json();
+            const voices = voicesData.data ? voicesData.data.voices : (voicesData.voices || []);
+
+            const voice = voices.find(v => v.voice_id === activeVoiceId);
+            if (voice) {
+                log(`Voice ${activeVoiceId} is available: ${voice.name}`);
+            } else {
+                log(`WARNING: Default Voice ${activeVoiceId} not found!`);
+                if (voices.length > 0) {
+                    // Try to find an English voice or just take the first one
+                    const englishVoice = voices.find(v => v.language === 'English' || v.name.includes('English'));
+                    if (englishVoice) {
+                         activeVoiceId = englishVoice.voice_id;
+                         log(`Switched to available voice: ${activeVoiceId} (${englishVoice.name})`);
+                    } else {
+                         activeVoiceId = voices[0].voice_id;
+                         log(`Switched to first available voice: ${activeVoiceId} (${voices[0].name})`);
+                    }
+                }
+            }
+        } else {
+            log('Failed to fetch voices list');
+        }
+
+    } catch (e) {
+        log(`Availability check failed: ${e.message}`);
+    }
+}
+
+// Check availability on load
+checkAvailability();
 
 class HeyGenAvatar {
     constructor(videoElement) {
@@ -36,7 +95,7 @@ class HeyGenAvatar {
     }
 
     async createSession(token) {
-        const response = await fetch('https://api.heygen.com/v1/streaming.new', {
+        const response = await fetch('https://api.heygen.com/v2/streaming/new', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -44,8 +103,8 @@ class HeyGenAvatar {
             },
             body: JSON.stringify({
                 quality: 'medium',
-                avatar_name: AVATAR_ID,
-                voice: { voice_id: VOICE_ID }
+                avatar_name: activeAvatarId,
+                voice: { voice_id: activeVoiceId }
             })
         });
         const data = await response.json();
@@ -72,7 +131,7 @@ class HeyGenAvatar {
 
             this.peerConnection.onicecandidate = async (event) => {
                 if (event.candidate) {
-                    await fetch('https://api.heygen.com/v1/streaming.ice', {
+                    await fetch('https://api.heygen.com/v2/streaming/ice', {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${this.token}`,
@@ -90,7 +149,7 @@ class HeyGenAvatar {
             const localSdp = await this.peerConnection.createAnswer();
             await this.peerConnection.setLocalDescription(localSdp);
 
-            await fetch('https://api.heygen.com/v1/streaming.start', {
+            await fetch('https://api.heygen.com/v2/streaming/start', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
@@ -113,7 +172,7 @@ class HeyGenAvatar {
     async speak(text) {
         if (!this.sessionId) return;
         try {
-            await fetch('https://api.heygen.com/v1/streaming.task', {
+            await fetch('https://api.heygen.com/v2/streaming/task', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
@@ -133,7 +192,7 @@ class HeyGenAvatar {
     async stopSession() {
         if (!this.sessionId || !this.token) return;
         try {
-            await fetch('https://api.heygen.com/v1/streaming.stop', {
+            await fetch('https://api.heygen.com/v2/streaming/stop', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
