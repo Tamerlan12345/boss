@@ -34,32 +34,34 @@ async function checkAvailability() {
             console.log("Full Avatar List:", avatars);
 
             if (avatars.length > 0) {
-                // Find current ID or default to first
+                // ЛОГИКА АВТОВЫБОРА:
+                // Если ID пустой или такого ID нет в списке — берем ПЕРВЫЙ доступный
                 let selectedAvatar = avatars.find(a => a.avatar_id === activeAvatarId);
 
                 if (!selectedAvatar) {
-                    selectedAvatar = avatars[0];
-                    activeAvatarId = selectedAvatar.avatar_id;
-                    log(`Auto-selected first avatar: ${selectedAvatar.name}`);
+                    selectedAvatar = avatars[0]; // Берем самый первый из списка
+                    activeAvatarId = selectedAvatar.avatar_id; // Сохраняем его ID
+                    log(`⚠️ Auto-selected Avatar: ${selectedAvatar.name}`);
+                } else {
+                    log(`✅ Found requested Avatar: ${selectedAvatar.name}`);
                 }
 
-                console.log("Selected Avatar Details:", selectedAvatar);
-                log(`Avatar ID: ${activeAvatarId} | Type: ${selectedAvatar.avatar_type || 'Unknown'}`);
+                log(`Using Avatar ID: ${activeAvatarId}`);
 
-                // --- NEW LOGIC: Set image from API ---
+                // Установка картинки (Poster)
                 const imageUrl = selectedAvatar.preview_image_url || selectedAvatar.thumbnail_url;
-
                 if (imageUrl) {
                     videoElement.poster = imageUrl;
-                    log('Avatar preview image updated from API');
                 }
-                // -------------------------------------
 
+                // Разблокировка кнопки
                 connectBtn.disabled = false;
                 statusDiv.textContent = 'Ready to Connect';
             } else {
-                log("ERROR: No avatars found in your HeyGen account!");
+                log("❌ ERROR: No Interactive Avatars found in your HeyGen account!");
                 statusDiv.textContent = 'No Avatars Found';
+                // Подсказка пользователю
+                log("Please go to HeyGen Labs -> Interactive Avatar and create/select one.");
             }
         } else {
             log('Failed to fetch avatars list');
@@ -303,4 +305,3 @@ connectBtn.onclick = async () => {
 disconnectBtn.onclick = () => {
     if (ws) ws.close();
 };
-
