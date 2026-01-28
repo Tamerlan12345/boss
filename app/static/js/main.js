@@ -107,7 +107,10 @@ class HeyGenAvatar {
             })
         });
         const data = await response.json();
-        if (!data.data) throw new Error('Failed to create session');
+        if (!data.data) {
+            console.error("Server Error Detail:", data);
+            throw new Error(data.error || 'Failed to create session');
+        }
         return data.data;
     }
 
