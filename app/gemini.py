@@ -31,7 +31,7 @@ class GeminiClient:
             "setup": {
                 "model": "models/gemini-2.5-flash-native-audio-latest",
                 "generationConfig": {
-                    "responseModalities": ["AUDIO"]
+                    "responseModalities": ["TEXT"]
                 }
             }
         }
@@ -83,7 +83,7 @@ class GeminiClient:
         await self.ws.send(json.dumps(msg))
 
     async def receive(self):
-        """Yields audio chunks from Gemini."""
+        """Yields text chunks from Gemini."""
         if not self.ws:
             return
 
@@ -97,11 +97,13 @@ class GeminiClient:
                         parts = server_content["modelTurn"].get("parts", [])
                         for part in parts:
                             if "inlineData" in part:
-                                # Audio data
+                                # Audio data (Not expected in TEXT mode, but just in case)
                                 b64_data = part["inlineData"]["data"]
                                 yield base64.b64decode(b64_data)
                             if "text" in part:
-                                logger.info(f"Gemini Text: {part['text']}")
+                                text = part["text"]
+                                logger.info(f"Gemini Text: {text}")
+                                yield text
 
                 if "toolCall" in data:
                     logger.info("Tool call received (not implemented)")
