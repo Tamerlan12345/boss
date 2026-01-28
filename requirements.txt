@@ -8,3 +8,6 @@ numpy
 requests
 resemblyzer
 torchaudio
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchaudio
