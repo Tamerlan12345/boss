@@ -18,8 +18,8 @@ function log(message) {
 }
 
 // HeyGen Avatar Logic
-let activeAvatarId = 'da4a68297f26487a95078864c39c55b5'; // Male Avatar (Tyler)
-let activeVoiceId = '132a2651478f44b2a8bb7492c34cb623'; // Male Voice
+let activeAvatarId = '';
+let activeVoiceId = '';
 
 async function checkAvailability() {
     try {
@@ -38,12 +38,13 @@ async function checkAvailability() {
                 let selectedAvatar = avatars.find(a => a.avatar_id === activeAvatarId);
 
                 if (!selectedAvatar) {
-                    log(`Default avatar ${activeAvatarId} not found. Switching to first available.`);
                     selectedAvatar = avatars[0];
                     activeAvatarId = selectedAvatar.avatar_id;
+                    log(`Auto-selected first avatar: ${selectedAvatar.name}`);
                 }
 
-                log(`Using Avatar: ${selectedAvatar.name} (ID: ${activeAvatarId})`);
+                console.log("Selected Avatar Details:", selectedAvatar);
+                log(`Avatar ID: ${activeAvatarId} | Type: ${selectedAvatar.avatar_type || 'Unknown'}`);
 
                 // --- NEW LOGIC: Set image from API ---
                 const imageUrl = selectedAvatar.preview_image_url || selectedAvatar.thumbnail_url;
