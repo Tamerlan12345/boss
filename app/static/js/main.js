@@ -31,23 +31,34 @@ async function checkAvailability() {
             const avatarsData = await avatarsResp.json();
             const avatars = avatarsData.data ? avatarsData.data.avatars : (avatarsData.avatars || []);
 
-            console.log("Available Avatars:", avatars);
+            console.log("Full Avatar List:", avatars);
 
             if (avatars.length > 0) {
-                const avatar = avatars.find(a => a.avatar_id === activeAvatarId);
-                if (avatar) {
-                    log(`Avatar ${activeAvatarId} is available: ${avatar.name}`);
-                } else {
-                    log(`WARNING: Default Avatar ${activeAvatarId} not found in available list!`);
-                    activeAvatarId = avatars[0].avatar_id;
-                    log(`Switched to available avatar: ${activeAvatarId} (${avatars[0].name})`);
+                // Find current ID or default to first
+                let selectedAvatar = avatars.find(a => a.avatar_id === activeAvatarId);
+
+                if (!selectedAvatar) {
+                    log(`Default avatar ${activeAvatarId} not found. Switching to first available.`);
+                    selectedAvatar = avatars[0];
+                    activeAvatarId = selectedAvatar.avatar_id;
                 }
 
-                // Unlock button only now
+                log(`Using Avatar: ${selectedAvatar.name} (ID: ${activeAvatarId})`);
+
+                // --- NEW LOGIC: Set image from API ---
+                const imageUrl = selectedAvatar.preview_image_url || selectedAvatar.thumbnail_url;
+
+                if (imageUrl) {
+                    videoElement.poster = imageUrl;
+                    log('Avatar preview image updated from API');
+                }
+                // -------------------------------------
+
                 connectBtn.disabled = false;
                 statusDiv.textContent = 'Ready to Connect';
             } else {
-                log("No avatars found in this HeyGen account!");
+                log("ERROR: No avatars found in your HeyGen account!");
+                statusDiv.textContent = 'No Avatars Found';
             }
         } else {
             log('Failed to fetch avatars list');
@@ -104,6 +115,7 @@ class HeyGenAvatar {
     }
 
     async createSession(token) {
+        log(`Creating session with Avatar ID: ${activeAvatarId}`);
         // ИЗМЕНЕНО: Запрос на наш сервер, а не на api.heygen.com
         const response = await fetch('/heygen/session/create', {
             method: 'POST',
