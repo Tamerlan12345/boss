@@ -46,7 +46,17 @@ async function checkAvailability() {
                     log(`✅ Found requested Avatar: ${selectedAvatar.name}`);
                 }
 
-                log(`Using Avatar ID: ${activeAvatarId}`);
+                // --- НОВАЯ ЛОГИКА ГОЛОСА ---
+                // Если у аватара нет голоса по умолчанию, ставим стандартный английский
+                if (selectedAvatar.default_voice_id) {
+                    activeVoiceId = selectedAvatar.default_voice_id;
+                } else {
+                    activeVoiceId = "2d5b0e6cf361460aa7fc47e3eee4ba54"; // Стандартный мужской голос (или выберите женский)
+                    log("Avatar has no default voice. Using fallback voice.");
+                }
+                // ---------------------------
+
+                log(`Using Avatar: ${selectedAvatar.name} | Voice: ${activeVoiceId}`);
 
                 // Установка картинки (Poster)
                 const imageUrl = selectedAvatar.preview_image_url || selectedAvatar.thumbnail_url;
@@ -132,8 +142,9 @@ class HeyGenAvatar {
         });
         const data = await response.json();
         if (!data.data) {
-            console.error("Server Error Detail:", data);
-            throw new Error(data.error || 'Failed to create session');
+            console.error("Server Error:", data);
+            // Превращаем объект ошибки в строку, чтобы прочитать её на экране
+            throw new Error(JSON.stringify(data.error) || 'Failed to create session');
         }
         return data.data;
     }
