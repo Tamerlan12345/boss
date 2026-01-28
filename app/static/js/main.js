@@ -4,6 +4,7 @@ let isConnected = false;
 let avatar = null;
 
 const connectBtn = document.getElementById('connectBtn');
+connectBtn.disabled = true; // Ensure disabled initially
 const disconnectBtn = document.getElementById('disconnectBtn');
 const statusDiv = document.getElementById('status');
 const logsDiv = document.getElementById('logs');
@@ -30,15 +31,23 @@ async function checkAvailability() {
             const avatarsData = await avatarsResp.json();
             const avatars = avatarsData.data ? avatarsData.data.avatars : (avatarsData.avatars || []);
 
-            const avatar = avatars.find(a => a.avatar_id === activeAvatarId);
-            if (avatar) {
-                log(`Avatar ${activeAvatarId} is available: ${avatar.name}`);
-            } else {
-                log(`WARNING: Default Avatar ${activeAvatarId} not found in available list!`);
-                if (avatars.length > 0) {
+            console.log("Available Avatars:", avatars);
+
+            if (avatars.length > 0) {
+                const avatar = avatars.find(a => a.avatar_id === activeAvatarId);
+                if (avatar) {
+                    log(`Avatar ${activeAvatarId} is available: ${avatar.name}`);
+                } else {
+                    log(`WARNING: Default Avatar ${activeAvatarId} not found in available list!`);
                     activeAvatarId = avatars[0].avatar_id;
                     log(`Switched to available avatar: ${activeAvatarId} (${avatars[0].name})`);
                 }
+
+                // Unlock button only now
+                connectBtn.disabled = false;
+                statusDiv.textContent = 'Ready to Connect';
+            } else {
+                log("No avatars found in this HeyGen account!");
             }
         } else {
             log('Failed to fetch avatars list');
