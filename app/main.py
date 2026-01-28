@@ -6,10 +6,15 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import uvicorn
 import os
-import requests
 import asyncio
 import logging
+import re
 from dotenv import load_dotenv
+import numpy as np
+import torch
+import torchaudio
+from openai import AsyncOpenAI
+
 from app.gemini import GeminiClient
 from app.speaker_id import SpeakerIdentifier
 from resemblyzer import VoiceEncoder
@@ -18,26 +23,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class SessionRequest(BaseModel):
-    quality: str = "medium"
-    avatar_name: str
-    voice_id: str
-
-class StartSessionRequest(BaseModel):
-    session_id: str
-    sdp: Dict[str, Any]
-
-class IceCandidateRequest(BaseModel):
-    session_id: str
-    candidate: Dict[str, Any]
-
-class TaskRequest(BaseModel):
-    session_id: str
-    text: str
-
-class StopSessionRequest(BaseModel):
-    session_id: str
-
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -45,13 +30,22 @@ templates = Jinja2Templates(directory="app/templates")
 
 global_encoder = None
 global_speakers = {}
+global_resampler = None
+
+# Initialize OpenAI Client
+openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.on_event("startup")
 async def startup_event():
-    global global_encoder, global_speakers
+    global global_encoder, global_speakers, global_resampler
     try:
         global_encoder = VoiceEncoder()
         logger.info("Global VoiceEncoder loaded")
+
+        # Init Resampler (24kHz -> 16kHz)
+        # We initialize it here to avoid re-creation overhead on every chunk
+        global_resampler = torchaudio.transforms.Resample(orig_freq=24000, new_freq=16000)
+        logger.info("Global Resampler loaded")
 
         # Load speakers
         temp_identifier = SpeakerIdentifier(encoder=global_encoder)
@@ -60,172 +54,58 @@ async def startup_event():
         logger.info(f"Loaded {len(global_speakers)} speakers")
 
     except Exception as e:
-        logger.error(f"Failed to load VoiceEncoder: {e}")
+        logger.error(f"Failed to load ML models: {e}")
 
 @app.get("/")
 async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.post("/token")
-def get_heygen_token():
-    api_key = os.getenv("HEYGEN_API_KEY")
-    if not api_key:
-        return {"error": "HEYGEN_API_KEY not found"}
-
-    try:
-        response = requests.post(
-            "https://api.heygen.com/v1/streaming.create_token",
-            headers={"x-api-key": api_key}
-        )
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        logger.error(f"Failed to get HeyGen token: {e}")
-        return {"error": str(e)}
-
-@app.get("/avatars")
-def get_heygen_avatars():
-    api_key = os.getenv("HEYGEN_API_KEY")
-    if not api_key:
-        return {"error": "HEYGEN_API_KEY not found"}
-
-    try:
-        response = requests.get(
-            "https://api.heygen.com/v2/avatars",
-            headers={"x-api-key": api_key}
-        )
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        logger.error(f"Failed to get HeyGen avatars: {e}")
-        return {"error": str(e)}
-
-@app.get("/voices")
-def get_heygen_voices():
-    api_key = os.getenv("HEYGEN_API_KEY")
-    if not api_key:
-        return {"error": "HEYGEN_API_KEY not found"}
-
-    try:
-        response = requests.get(
-            "https://api.heygen.com/v2/voices",
-            headers={"x-api-key": api_key}
-        )
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        logger.error(f"Failed to get HeyGen voices: {e}")
-        return {"error": str(e)}
-
-# Вспомогательная функция для заголовков
-def get_auth_headers(token: str):
+@app.get("/simli/config")
+def get_simli_config():
     return {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
+        "apiKey": os.getenv("SIMLI_API_KEY"),
+        "faceID": os.getenv("SIMLI_FACE_ID"),
     }
 
-@app.post("/heygen/session/create")
-async def proxy_create_session(request: Request):
-    data = await request.json()
-    # Клиент должен прислать token в теле или мы получаем его тут
-    token = data.get("token")
-
+def resample_audio_sync(audio_bytes: bytes) -> bytes:
+    """
+    Synchronous function to be run in executor.
+    """
+    if not audio_bytes or not global_resampler:
+        return b""
     try:
-        resp = requests.post(
-            "https://api.heygen.com/v1/streaming.new",
-            headers=get_auth_headers(token),
-            json={
-                "quality": data.get("quality", "medium"),
-                "avatar_name": data.get("avatar_name"),
-                "voice": {"voice_id": data.get("voice_id")}
-            }
-        )
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.HTTPError as e:
-        try:
-            error_detail = e.response.json()
-        except Exception:
-            error_detail = e.response.text
-        logger.error(f"HeyGen Create Error: {error_detail}")
-        return {"error": error_detail}
-    except Exception as e:
-        logger.error(f"HeyGen Create Error: {e}")
-        return {"error": str(e)}
+        # Convert raw bytes (int16) to float32 tensor
+        waveform = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+        waveform = torch.from_numpy(waveform).unsqueeze(0)  # Shape (1, L)
 
-@app.post("/heygen/session/start")
-async def proxy_start_session(request: Request):
-    data = await request.json()
-    token = data.get("token")
-    try:
-        resp = requests.post(
-            "https://api.heygen.com/v1/streaming.start",
-            headers=get_auth_headers(token),
-            json={
-                "session_id": data.get("session_id"),
-                "sdp": data.get("sdp")
-            }
-        )
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        logger.error(f"HeyGen Start Error: {e}")
-        return {"error": str(e)}
+        # Resample using the global pre-initialized resampler
+        resampled_waveform = global_resampler(waveform)
 
-@app.post("/heygen/ice")
-async def proxy_ice(request: Request):
-    data = await request.json()
-    token = data.get("token")
-    try:
-        resp = requests.post(
-            "https://api.heygen.com/v1/streaming.ice",
-            headers=get_auth_headers(token),
-            json={
-                "session_id": data.get("session_id"),
-                "candidate": data.get("candidate")
-            }
-        )
-        resp.raise_for_status()
-        return resp.json()
+        # Convert back to int16 bytes
+        resampled_np = resampled_waveform.squeeze(0).numpy().astype(np.int16)
+        return resampled_np.tobytes()
     except Exception as e:
-        # ICE ошибки часто не критичны, но логируем
-        logger.error(f"HeyGen ICE Error: {e}")
-        return {"error": str(e)}
+        logger.error(f"Resampling error: {e}")
+        return audio_bytes # Fallback
 
-@app.post("/heygen/task")
-async def proxy_task(request: Request):
-    data = await request.json()
-    token = data.get("token")
+async def text_to_speech_pcm(text: str) -> bytes:
     try:
-        resp = requests.post(
-            "https://api.heygen.com/v1/streaming.task",
-            headers=get_auth_headers(token),
-            json={
-                "session_id": data.get("session_id"),
-                "text": data.get("text")
-            }
+        # OpenAI TTS-1 output is 24kHz for 'pcm' format by default
+        response = await openai_client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",
+            input=text,
+            response_format="pcm"
         )
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        logger.error(f"HeyGen Task Error: {e}")
-        return {"error": str(e)}
+        audio_data = response.content
 
-@app.post("/heygen/session/stop")
-async def proxy_stop(request: Request):
-    data = await request.json()
-    token = data.get("token")
-    try:
-        resp = requests.post(
-            "https://api.heygen.com/v1/streaming.stop",
-            headers=get_auth_headers(token),
-            json={
-                "session_id": data.get("session_id")
-            }
-        )
-        return resp.json()
+        # Run CPU-bound resampling in a thread pool to avoid blocking async loop
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, resample_audio_sync, audio_data)
+
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"TTS Error: {e}")
+        return b""
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -258,7 +138,7 @@ async def websocket_endpoint(websocket: WebSocket):
             nonlocal current_speaker
             try:
                 while True:
-                    # Expecting raw PCM bytes
+                    # Expecting raw PCM bytes from user microphone
                     data = await websocket.receive_bytes()
 
                     # Speaker ID (Run in executor to avoid blocking)
@@ -276,12 +156,43 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.error(f"Error receiving from client: {e}")
 
         async def send_to_client():
+            text_buffer = ""
             try:
                 async for chunk in gemini_client.receive():
                     if isinstance(chunk, str):
-                        await websocket.send_text(chunk)
+                        text_buffer += chunk
+
+                        # Buffer until we have a complete sentence to ensure high-quality TTS
+                        # Split by punctuation followed by whitespace
+                        sentences = re.split(r'(?<=[.!?])\s+', text_buffer)
+
+                        if len(sentences) > 1:
+                            # We have at least one complete sentence
+                            to_process = sentences[:-1]
+                            text_buffer = sentences[-1]
+
+                            for sentence in to_process:
+                                if sentence.strip():
+                                    logger.info(f"TTS Sentence: {sentence[:30]}...")
+                                    audio = await text_to_speech_pcm(sentence)
+                                    if audio: await websocket.send_bytes(audio)
+
+                        # Fallback: if buffer gets too large without punctuation, flush it
+                        if len(text_buffer) > 250:
+                            logger.info("Flushing large text buffer")
+                            audio = await text_to_speech_pcm(text_buffer)
+                            text_buffer = ""
+                            if audio: await websocket.send_bytes(audio)
+
                     elif isinstance(chunk, bytes):
+                        # Audio passthrough
                         await websocket.send_bytes(chunk)
+
+                # Flush remaining text at end of stream
+                if text_buffer.strip():
+                    audio = await text_to_speech_pcm(text_buffer)
+                    if audio: await websocket.send_bytes(audio)
+
             except Exception as e:
                 logger.error(f"Error sending to client: {e}")
 
