@@ -1,16 +1,13 @@
 let audioContext;
 let ws;
 let isConnected = false;
-let nextStartTime = 0;
-let analyser;
-let mouthCanvas;
-let mouthCtx;
-let animationId;
+let avatar = null;
 
 const connectBtn = document.getElementById('connectBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
 const statusDiv = document.getElementById('status');
 const logsDiv = document.getElementById('logs');
+const videoElement = document.getElementById('heygen-video');
 
 function log(message) {
     const div = document.createElement('div');
@@ -19,23 +16,156 @@ function log(message) {
     logsDiv.prepend(div);
 }
 
+// HeyGen Avatar Logic
+const AVATAR_ID = 'da4a68297f26487a95078864c39c55b5'; // Male Avatar (Tyler)
+const VOICE_ID = '132a2651478f44b2a8bb7492c34cb623'; // Male Voice
+
+class HeyGenAvatar {
+    constructor(videoElement) {
+        this.videoElement = videoElement;
+        this.peerConnection = null;
+        this.sessionId = null;
+        this.token = null;
+    }
+
+    async getToken() {
+        const response = await fetch('/token', { method: 'POST' });
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        return data.data.token;
+    }
+
+    async createSession(token) {
+        const response = await fetch('https://api.heygen.com/v1/streaming.new', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                quality: 'medium',
+                avatar_name: AVATAR_ID,
+                voice: { voice_id: VOICE_ID }
+            })
+        });
+        const data = await response.json();
+        if (!data.data) throw new Error('Failed to create session');
+        return data.data;
+    }
+
+    async startStreaming() {
+        try {
+            log('Starting HeyGen Avatar...');
+            this.token = await this.getToken();
+            const sessionData = await this.createSession(this.token);
+            this.sessionId = sessionData.session_id;
+            const { sdp: serverSdp, ice_servers2: iceServers } = sessionData;
+
+            this.peerConnection = new RTCPeerConnection({ iceServers: iceServers });
+
+            this.peerConnection.ontrack = (event) => {
+                if (event.track.kind === 'video' && this.videoElement.srcObject !== event.streams[0]) {
+                    this.videoElement.srcObject = event.streams[0];
+                    log('Video stream received');
+                }
+            };
+
+            this.peerConnection.onicecandidate = async (event) => {
+                if (event.candidate) {
+                    await fetch('https://api.heygen.com/v1/streaming.ice', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${this.token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            session_id: this.sessionId,
+                            candidate: event.candidate
+                        })
+                    });
+                }
+            };
+
+            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(serverSdp));
+            const localSdp = await this.peerConnection.createAnswer();
+            await this.peerConnection.setLocalDescription(localSdp);
+
+            await fetch('https://api.heygen.com/v1/streaming.start', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: this.sessionId,
+                    sdp: localSdp
+                })
+            });
+
+            log('HeyGen Session Started');
+
+        } catch (e) {
+            log(`HeyGen Error: ${e.message}`);
+            throw e;
+        }
+    }
+
+    async speak(text) {
+        if (!this.sessionId) return;
+        try {
+            await fetch('https://api.heygen.com/v1/streaming.task', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: this.sessionId,
+                    text: text
+                })
+            });
+            log(`Avatar speaking: ${text}`);
+        } catch (e) {
+            log(`Speak Error: ${e.message}`);
+        }
+    }
+
+    async stopSession() {
+        if (!this.sessionId || !this.token) return;
+        try {
+            await fetch('https://api.heygen.com/v1/streaming.stop', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: this.sessionId
+                })
+            });
+            log('HeyGen Session Stopped');
+        } catch (e) {
+            log(`Stop Session Error: ${e.message}`);
+        }
+    }
+
+    close() {
+        if (this.peerConnection) this.peerConnection.close();
+        this.stopSession();
+    }
+}
+
 connectBtn.onclick = async () => {
     try {
         statusDiv.textContent = 'Connecting...';
 
-        // Initialize AudioContext
-        // Try to force 16kHz to match Gemini requirement, otherwise we might need resampling
+        // Start Avatar
+        avatar = new HeyGenAvatar(videoElement);
+        await avatar.startStreaming();
+
+        // Initialize AudioContext for Microphone Input
         audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         log(`AudioContext created. Sample Rate: ${audioContext.sampleRate}`);
-
-        // Setup Analyser for Lip-Sync
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.5;
-        analyser.connect(audioContext.destination);
-
-        mouthCanvas = document.getElementById('mouth-canvas');
-        mouthCtx = mouthCanvas.getContext('2d');
 
         await audioContext.audioWorklet.addModule('/static/js/audio-processor.js');
 
@@ -44,17 +174,11 @@ connectBtn.onclick = async () => {
         const processor = new AudioWorkletNode(audioContext, 'pcm-processor');
 
         source.connect(processor);
-        // User audio doesn't go to analyser (we don't want Dos to lip-sync user audio)
-        // But user audio goes to destination?
-        // Wait, processor.connect(audioContext.destination) in original code.
-        // If we connect processor to destination, we hear ourselves?
-        // In audio-processor.js, it silences output. So it's fine.
-        processor.connect(audioContext.destination);
+        processor.connect(audioContext.destination); // Required for AudioWorklet to run, but output is silenced in processor
 
         // Check protocol
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${location.host}/ws`);
-        ws.binaryType = 'arraybuffer';
 
         ws.onopen = () => {
             isConnected = true;
@@ -62,7 +186,6 @@ connectBtn.onclick = async () => {
             connectBtn.disabled = true;
             disconnectBtn.disabled = false;
             log('WebSocket connected');
-            animateMouth();
         };
 
         ws.onclose = () => {
@@ -71,10 +194,10 @@ connectBtn.onclick = async () => {
             connectBtn.disabled = false;
             disconnectBtn.disabled = true;
             log('WebSocket closed');
-            if (animationId) cancelAnimationFrame(animationId);
             processor.disconnect();
             source.disconnect();
             if (audioContext) audioContext.close();
+            if (avatar) avatar.close();
         };
 
         ws.onerror = (e) => {
@@ -82,11 +205,10 @@ connectBtn.onclick = async () => {
         };
 
         ws.onmessage = async (event) => {
-            if (event.data instanceof ArrayBuffer) {
-                // Play audio
-                playAudioChunk(event.data);
-            } else {
-                log(`Received text: ${event.data}`);
+            // Receive text from Gemini
+            log(`Gemini: ${event.data}`);
+            if (avatar) {
+                avatar.speak(event.data);
             }
         };
 
@@ -107,82 +229,3 @@ disconnectBtn.onclick = () => {
     if (ws) ws.close();
 };
 
-function playAudioChunk(arrayBuffer) {
-    // Gemini usually sends 24kHz PCM (Mono).
-    const int16Data = new Int16Array(arrayBuffer);
-    const float32Data = new Float32Array(int16Data.length);
-
-    for (let i = 0; i < int16Data.length; i++) {
-        float32Data[i] = int16Data[i] / 32768.0;
-    }
-
-    // Create buffer. 24000 is the default for Gemini Live
-    const buffer = audioContext.createBuffer(1, float32Data.length, 24000);
-    buffer.getChannelData(0).set(float32Data);
-
-    const source = audioContext.createBufferSource();
-    source.buffer = buffer;
-    // Connect to analyser for lip-sync, which is connected to destination
-    source.connect(analyser);
-
-    const currentTime = audioContext.currentTime;
-    if (nextStartTime < currentTime) {
-        nextStartTime = currentTime;
-    }
-    source.start(nextStartTime);
-    nextStartTime += buffer.duration;
-
-}
-
-function animateMouth() {
-    if (!isConnected) return;
-    animationId = requestAnimationFrame(animateMouth);
-
-    if (!analyser) return;
-
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    analyser.getByteTimeDomainData(dataArray);
-
-    let sum = 0;
-    for(let i = 0; i < bufferLength; i++) {
-        // value is 128 for silence (0 amplitude)
-        const v = (dataArray[i] - 128) / 128;
-        sum += v * v;
-    }
-    const rms = Math.sqrt(sum / bufferLength);
-
-    drawMouth(rms);
-}
-
-function drawMouth(amplitude) {
-    if (!mouthCtx) return;
-
-    mouthCtx.clearRect(0, 0, mouthCanvas.width, mouthCanvas.height);
-
-    const centerX = 100;
-    const centerY = 145;
-    const width = 50;
-
-    // Scale amplitude
-    // Amplitude is typically small for speech, need boost
-    const sensitivity = 5.0;
-    let openHeight = Math.max(2, amplitude * 100 * sensitivity);
-    if (openHeight > 60) openHeight = 60; // Max open
-
-    mouthCtx.fillStyle = '#333'; // Inside of mouth
-    mouthCtx.beginPath();
-
-    if (amplitude < 0.01) {
-        // Closed mouth
-        mouthCtx.moveTo(centerX - width/2, centerY);
-        mouthCtx.lineTo(centerX + width/2, centerY);
-        mouthCtx.strokeStyle = '#333';
-        mouthCtx.lineWidth = 3;
-        mouthCtx.stroke();
-    } else {
-        // Open mouth
-        mouthCtx.ellipse(centerX, centerY, width/2, openHeight/2, 0, 0, 2 * Math.PI);
-        mouthCtx.fill();
-    }
-}

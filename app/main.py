@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 import uvicorn
 import os
+import requests
 import asyncio
 import logging
 from dotenv import load_dotenv
@@ -42,6 +43,23 @@ async def startup_event():
 @app.get("/")
 async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+@app.post("/token")
+def get_heygen_token():
+    api_key = os.getenv("HEYGEN_API_KEY")
+    if not api_key:
+        return {"error": "HEYGEN_API_KEY not found"}
+
+    try:
+        response = requests.post(
+            "https://api.heygen.com/v1/streaming.create_token",
+            headers={"x-api-key": api_key}
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"Failed to get HeyGen token: {e}")
+        return {"error": str(e)}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -93,8 +111,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
         async def send_to_client():
             try:
-                async for audio_chunk in gemini_client.receive():
-                    await websocket.send_bytes(audio_chunk)
+                async for chunk in gemini_client.receive():
+                    if isinstance(chunk, str):
+                        await websocket.send_text(chunk)
+                    elif isinstance(chunk, bytes):
+                        await websocket.send_bytes(chunk)
             except Exception as e:
                 logger.error(f"Error sending to client: {e}")
 
