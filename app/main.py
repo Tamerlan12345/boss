@@ -61,6 +61,40 @@ def get_heygen_token():
         logger.error(f"Failed to get HeyGen token: {e}")
         return {"error": str(e)}
 
+@app.get("/avatars")
+def get_heygen_avatars():
+    api_key = os.getenv("HEYGEN_API_KEY")
+    if not api_key:
+        return {"error": "HEYGEN_API_KEY not found"}
+
+    try:
+        response = requests.get(
+            "https://api.heygen.com/v2/avatars",
+            headers={"x-api-key": api_key}
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"Failed to get HeyGen avatars: {e}")
+        return {"error": str(e)}
+
+@app.get("/voices")
+def get_heygen_voices():
+    api_key = os.getenv("HEYGEN_API_KEY")
+    if not api_key:
+        return {"error": "HEYGEN_API_KEY not found"}
+
+    try:
+        response = requests.get(
+            "https://api.heygen.com/v2/voices",
+            headers={"x-api-key": api_key}
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"Failed to get HeyGen voices: {e}")
+        return {"error": str(e)}
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
