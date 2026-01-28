@@ -142,6 +142,13 @@ async def proxy_create_session(request: Request):
         )
         resp.raise_for_status()
         return resp.json()
+    except requests.exceptions.HTTPError as e:
+        try:
+            error_detail = e.response.json()
+        except Exception:
+            error_detail = e.response.text
+        logger.error(f"HeyGen Create Error: {error_detail}")
+        return {"error": error_detail}
     except Exception as e:
         logger.error(f"HeyGen Create Error: {e}")
         return {"error": str(e)}
