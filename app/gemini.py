@@ -29,7 +29,7 @@ class GeminiClient:
     async def _send_setup(self, system_instruction: str = None):
         setup_msg = {
             "setup": {
-                "model": "models/gemini-2.0-flash",
+                "model": "models/gemini-2.5-flash-native-audio-latest",
                 "generationConfig": {
                     "responseModalities": ["AUDIO"]
                 }
