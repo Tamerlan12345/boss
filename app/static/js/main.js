@@ -18,7 +18,7 @@ function log(message) {
 }
 
 // HeyGen Avatar Logic
-let activeAvatarId = '';
+let activeAvatarId = 'ca4fe01c15c24cb7badbbff612c6dd13';
 let activeVoiceId = '';
 
 async function checkAvailability() {
