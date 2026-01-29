@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 import numpy as np
 import torch
 import torchaudio
-from openai import AsyncOpenAI
 
 from app.gemini import GeminiClient
 from app.speaker_id import SpeakerIdentifier
@@ -31,9 +30,6 @@ templates = Jinja2Templates(directory="app/templates")
 global_encoder = None
 global_speakers = {}
 global_resampler = None
-
-# Initialize OpenAI Client
-openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.on_event("startup")
 async def startup_event():
@@ -88,25 +84,6 @@ def resample_audio_sync(audio_bytes: bytes) -> bytes:
         logger.error(f"Resampling error: {e}")
         return audio_bytes # Fallback
 
-async def text_to_speech_pcm(text: str) -> bytes:
-    try:
-        # OpenAI TTS-1 output is 24kHz for 'pcm' format by default
-        response = await openai_client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
-            input=text,
-            response_format="pcm"
-        )
-        audio_data = response.content
-
-        # Run CPU-bound resampling in a thread pool to avoid blocking async loop
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, resample_audio_sync, audio_data)
-
-    except Exception as e:
-        logger.error(f"TTS Error: {e}")
-        return b""
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -156,42 +133,20 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.error(f"Error receiving from client: {e}")
 
         async def send_to_client():
-            text_buffer = ""
+            loop = asyncio.get_running_loop()
             try:
                 async for chunk in gemini_client.receive():
-                    if isinstance(chunk, str):
-                        text_buffer += chunk
+                    if isinstance(chunk, bytes):
+                        # Gemini Native Audio is 24kHz PCM.
+                        # We must resample to 16kHz for the frontend/Simli.
+                        # Using run_in_executor for CPU-bound resampling task.
+                        resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
+                        if resampled_audio:
+                            await websocket.send_bytes(resampled_audio)
 
-                        # Buffer until we have a complete sentence to ensure high-quality TTS
-                        # Split by punctuation followed by whitespace
-                        sentences = re.split(r'(?<=[.!?])\s+', text_buffer)
-
-                        if len(sentences) > 1:
-                            # We have at least one complete sentence
-                            to_process = sentences[:-1]
-                            text_buffer = sentences[-1]
-
-                            for sentence in to_process:
-                                if sentence.strip():
-                                    logger.info(f"TTS Sentence: {sentence[:30]}...")
-                                    audio = await text_to_speech_pcm(sentence)
-                                    if audio: await websocket.send_bytes(audio)
-
-                        # Fallback: if buffer gets too large without punctuation, flush it
-                        if len(text_buffer) > 250:
-                            logger.info("Flushing large text buffer")
-                            audio = await text_to_speech_pcm(text_buffer)
-                            text_buffer = ""
-                            if audio: await websocket.send_bytes(audio)
-
-                    elif isinstance(chunk, bytes):
-                        # Audio passthrough
-                        await websocket.send_bytes(chunk)
-
-                # Flush remaining text at end of stream
-                if text_buffer.strip():
-                    audio = await text_to_speech_pcm(text_buffer)
-                    if audio: await websocket.send_bytes(audio)
+                    elif isinstance(chunk, str):
+                        # If we receive text (e.g. metadata or transcript), we just log it
+                        logger.info(f"Received text from Gemini: {chunk}")
 
             except Exception as e:
                 logger.error(f"Error sending to client: {e}")
