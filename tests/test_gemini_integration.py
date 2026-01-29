@@ -93,5 +93,51 @@ class TestGeminiLogic(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(mock_resampler.call_count, 1)
                 mock_resampler.assert_called_with(b"audio_raw")
 
+    def test_audio_buffering(self):
+        """
+        Verify that app.main.send_to_client buffers small audio chunks.
+        """
+        mock_gemini_instance = MagicMock()
+        mock_gemini_instance.connect = AsyncMock()
+        mock_gemini_instance.send_text = AsyncMock()
+        mock_gemini_instance.send_audio = AsyncMock()
+        mock_gemini_instance.close = AsyncMock()
+
+        # We will emit 5 chunks of 1000 bytes each.
+        # Total 5000 bytes.
+        # Expected behavior with threshold 4096:
+        # It accumulates until >= 4096.
+        # 4 chunks = 4000 ( < 4096).
+        # 5 chunks = 5000 ( >= 4096).
+        # So the first message received by client should be 5000 bytes.
+        # (Assuming the implementation sends the whole accumulated buffer)
+
+        async def mock_receive_gen():
+            chunk = b"x" * 1000
+            for _ in range(5):
+                yield chunk
+                # yield control to let the loop process
+                await asyncio.sleep(0.001)
+
+        mock_gemini_instance.receive = mock_receive_gen
+
+        # Mock resample to return input as is
+        def mock_resample(data):
+            return data
+
+        with patch("app.main.GeminiClient", return_value=mock_gemini_instance), \
+             patch("app.main.resample_audio_sync", side_effect=mock_resample), \
+             patch("app.main.SpeakerIdentifier"), \
+             patch("app.main.VoiceEncoder"):
+
+            client = TestClient(app)
+            with client.websocket_connect("/ws") as websocket:
+                # If buffering is NOT implemented, we would get 1000 bytes immediately.
+                data = websocket.receive_bytes()
+
+                # Check that we received a combined chunk
+                self.assertGreaterEqual(len(data), 4096)
+                self.assertEqual(len(data), 5000)
+
 if __name__ == "__main__":
     unittest.main()
