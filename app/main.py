@@ -104,9 +104,14 @@ async def websocket_endpoint(websocket: WebSocket):
             "ACTIVATION: Speak ONLY if the user explicitly says 'Dos' at the start. "
             "If 'Dos' is not heard, output NOTHING (silence). "
             "IDENTITY: If asked 'Who are you?', say exactly: 'Я ИИ спикер Dos'. "
-            "LANGUAGE: Speak Russian."
+            "LANGUAGE: Speak Russian. "
+            "Speak clearly, with a moderate pace, articulating words distinctively to ensure good lip-sync."
         )
         await gemini_client.connect(system_instruction=system_instruction)
+
+        # --- Delay for Simli stabilization ---
+        logger.info("Pausing for Simli stabilization...")
+        await asyncio.sleep(1.5)
 
         # Trigger Welcome Message
         # The assistant must initiate the dialogue.
@@ -138,6 +143,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
         async def send_to_client():
             loop = asyncio.get_running_loop()
+            audio_buffer = bytearray()
+            MIN_CHUNK_SIZE = 4096 # Accumulate at least 4KB to reduce jitter
+
             try:
                 async for chunk in gemini_client.receive():
                     if isinstance(chunk, bytes):
@@ -146,11 +154,20 @@ async def websocket_endpoint(websocket: WebSocket):
                         # Using run_in_executor for CPU-bound resampling task.
                         resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
                         if resampled_audio:
-                            await websocket.send_bytes(resampled_audio)
+                            audio_buffer.extend(resampled_audio)
+
+                            # Send only when we have enough data (Simli buffering)
+                            if len(audio_buffer) >= MIN_CHUNK_SIZE:
+                                await websocket.send_bytes(bytes(audio_buffer))
+                                audio_buffer.clear()
 
                     elif isinstance(chunk, str):
                         # If we receive text (e.g. metadata or transcript), we just log it
                         logger.info(f"Received text from Gemini: {chunk}")
+
+                # Flush remaining audio in buffer
+                if len(audio_buffer) > 0:
+                    await websocket.send_bytes(bytes(audio_buffer))
 
             except Exception as e:
                 logger.error(f"Error sending to client: {e}")
