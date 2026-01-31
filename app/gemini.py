@@ -29,9 +29,9 @@ class GeminiClient:
     async def _send_setup(self, system_instruction: str = None):
         setup_msg = {
             "setup": {
-                "model": "models/gemini-2.5-flash-native-audio-latest",
+                "model": "models/gemini-2.5-flash-native-audio-preview-12-2025",
                 "generationConfig": {
-                    "responseModalities": ["AUDIO", "TEXT"],
+                    "responseModalities": ["AUDIO"],
                     "speechConfig": {
                         "voiceConfig": {
                             "prebuiltVoiceConfig": {
@@ -48,10 +48,13 @@ class GeminiClient:
             }
 
         await self.ws.send(json.dumps(setup_msg))
-        # Wait for potential setup complete or just proceed.
-        # The API doesn't always send a specific "Setup Complete" message immediately,
-        # but the first message usually confirms it or errors.
-        # For now, we assume success if no error on send.
+        # Read the first message immediately to catch authorization/config errors (Handshake)
+        try:
+            initial_response = await self.ws.recv()
+            logger.info(f"Gemini Setup Response: {initial_response}")
+        except Exception as e:
+            logger.error(f"Error during Gemini handshake: {e}")
+            raise
 
     async def send_audio(self, audio_data: bytes):
         """Sends raw PCM 16kHz audio data to Gemini."""
