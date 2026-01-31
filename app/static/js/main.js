@@ -4,20 +4,65 @@ let audioContext;
 let ws;
 let isConnected = false;
 let avatar = null;
+let animationId;
+let analyser;
+let dataArray;
 
 const connectBtn = document.getElementById('connectBtn');
-connectBtn.disabled = false; // Enabled by default now, as we don't check avatars
 const disconnectBtn = document.getElementById('disconnectBtn');
 const statusDiv = document.getElementById('status');
 const logsDiv = document.getElementById('logs');
 const videoElement = document.getElementById('simli-video');
 const audioElement = document.getElementById('simli-audio');
+const avatarFrame = document.getElementById('avatarFrame');
+const canvas = document.getElementById('audio-visualizer');
+const canvasCtx = canvas.getContext('2d');
 
-function log(message) {
+function appendToLog(role, text) {
     const div = document.createElement('div');
-    div.className = 'log-entry';
-    div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
-    logsDiv.prepend(div);
+    div.className = `log-entry role-${role.toLowerCase()}`;
+
+    const timestamp = new Date().toLocaleTimeString();
+    const roleLabel = role.toUpperCase();
+
+    const timestampSpan = document.createElement('span');
+    timestampSpan.className = 'timestamp';
+    timestampSpan.textContent = `[${timestamp}] `;
+
+    const roleSpan = document.createElement('span');
+    roleSpan.className = 'role-label';
+    roleSpan.textContent = `${roleLabel}> `;
+
+    const textNode = document.createTextNode(text);
+
+    div.appendChild(timestampSpan);
+    div.appendChild(roleSpan);
+    div.appendChild(textNode);
+
+    logsDiv.appendChild(div);
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+}
+
+// Visualizer
+function drawVisualizer() {
+    if (!isConnected) return;
+
+    animationId = requestAnimationFrame(drawVisualizer);
+    analyser.getByteFrequencyData(dataArray);
+
+    canvasCtx.fillStyle = '#111';
+    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const barWidth = (canvas.width / dataArray.length) * 2.5;
+    let barHeight;
+    let x = 0;
+
+    for(let i = 0; i < dataArray.length; i++) {
+        barHeight = dataArray[i] / 4; // Scale down
+        canvasCtx.fillStyle = `rgb(${barHeight + 100}, 50, 255)`; // Purpleish
+        canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
+    }
 }
 
 class SimliAvatar {
@@ -30,7 +75,7 @@ class SimliAvatar {
 
     async initialize() {
         try {
-            log("Fetching Simli config...");
+            appendToLog('SYSTEM', "Fetching Simli config...");
             const resp = await fetch('/simli/config');
             if (!resp.ok) throw new Error("Failed to load config");
             this.config = await resp.json();
@@ -48,39 +93,44 @@ class SimliAvatar {
                 enableConsoleLogs: true,
             };
 
-            log("Initializing Simli Client...");
+            appendToLog('SYSTEM', "Initializing Simli Client...");
             this.simliClient.Initialize(simliConfig);
 
             this.simliClient.on("connected", () => {
-                log("✅ Simli WebRTC Connected");
-                statusDiv.textContent = "Simli Connected";
+                appendToLog('SYSTEM', "✅ Simli WebRTC Connected");
+                statusDiv.textContent = "SYSTEM: ONLINE";
+                statusDiv.style.color = "var(--acid-green)";
             });
 
             this.simliClient.on("failed", () => {
-                log("❌ Simli Connection Failed");
-                statusDiv.textContent = "Connection Failed";
+                appendToLog('SYSTEM', "❌ Simli Connection Failed");
+                statusDiv.textContent = "SYSTEM: ERROR";
+                statusDiv.style.color = "red";
             });
 
             this.simliClient.on("disconnected", () => {
-                log("⚠️ Simli Disconnected");
-                statusDiv.textContent = "Disconnected";
+                appendToLog('SYSTEM', "⚠️ Simli Disconnected");
+                statusDiv.textContent = "SYSTEM: DISCONNECTED";
+                statusDiv.style.color = "var(--text-color)";
             });
 
         } catch (e) {
-            log(`Simli Init Error: ${e.message}`);
+            appendToLog('SYSTEM', `Simli Init Error: ${e.message}`);
             throw e;
         }
     }
 
     start() {
-        log("Starting Simli Session...");
+        appendToLog('SYSTEM', "Starting Simli Session...");
         this.simliClient.start();
     }
 
     speak(audioData) {
         if (this.simliClient) {
-            // audioData is Uint8Array (PCM16 16kHz)
             this.simliClient.sendAudioData(audioData);
+            // Flash frame
+            avatarFrame.classList.add('speaking');
+            setTimeout(() => avatarFrame.classList.remove('speaking'), 200);
         }
     }
 
@@ -93,7 +143,7 @@ class SimliAvatar {
 
 connectBtn.onclick = async () => {
     try {
-        statusDiv.textContent = 'Connecting...';
+        statusDiv.textContent = 'INITIATING HANDSHAKE...';
         connectBtn.disabled = true;
 
         // 1. Start Simli Avatar
@@ -101,9 +151,12 @@ connectBtn.onclick = async () => {
         await avatar.initialize();
         avatar.start();
 
-        // 2. Initialize AudioContext for Microphone Input
+        // 2. Initialize AudioContext for Microphone Input and Visualizer
         audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        log(`AudioContext created. Sample Rate: ${audioContext.sampleRate}`);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
 
         await audioContext.audioWorklet.addModule('/static/js/audio-processor.js');
 
@@ -111,48 +164,64 @@ connectBtn.onclick = async () => {
         const source = audioContext.createMediaStreamSource(stream);
         const processor = new AudioWorkletNode(audioContext, 'pcm-processor');
 
+        source.connect(analyser); // Visualizer
         source.connect(processor);
         processor.connect(audioContext.destination);
+
+        drawVisualizer();
 
         // 3. Connect to Backend WebSocket
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${location.host}/ws`);
-        ws.binaryType = 'arraybuffer'; // Expect binary audio back
+        ws.binaryType = 'arraybuffer';
 
         ws.onopen = () => {
             isConnected = true;
-            statusDiv.textContent = 'System Connected';
+            statusDiv.textContent = 'SYSTEM: CONNECTED';
+            statusDiv.style.color = "var(--acid-green)";
             disconnectBtn.disabled = false;
-            log('WebSocket connected');
+            appendToLog('SYSTEM', 'Neural Uplink Established.');
         };
 
         ws.onclose = () => {
             isConnected = false;
-            statusDiv.textContent = 'Disconnected';
+            statusDiv.textContent = 'SYSTEM: OFFLINE';
+            statusDiv.style.color = "var(--text-color)";
             connectBtn.disabled = false;
             disconnectBtn.disabled = true;
-            log('WebSocket closed');
+            appendToLog('SYSTEM', 'Neural Uplink Terminated.');
 
             processor.disconnect();
             source.disconnect();
             if (audioContext) audioContext.close();
             if (avatar) avatar.close();
+            cancelAnimationFrame(animationId);
         };
 
         ws.onerror = (e) => {
-            log(`WebSocket error: ${e}`);
+            appendToLog('SYSTEM', `WebSocket error: ${e}`);
         };
 
         ws.onmessage = async (event) => {
             if (event.data instanceof ArrayBuffer) {
-                // Received Audio from TTS
-                // log(`Received Audio Chunk: ${event.data.byteLength} bytes`);
+                // Audio
                 const uint8 = new Uint8Array(event.data);
                 if (avatar) {
                     avatar.speak(uint8);
                 }
             } else {
-                log(`Text: ${event.data}`);
+                // Text / JSON
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'log') {
+                        appendToLog(msg.role, msg.text);
+                    } else {
+                        appendToLog('UNKNOWN', event.data);
+                    }
+                } catch (e) {
+                    // Fallback for plain text if any
+                    appendToLog('INFO', event.data);
+                }
             }
         };
 
@@ -164,8 +233,9 @@ connectBtn.onclick = async () => {
         };
 
     } catch (e) {
-        log(`Error: ${e.message}`);
-        statusDiv.textContent = 'Error';
+        appendToLog('ERROR', `Initialization Error: ${e.message}`);
+        statusDiv.textContent = 'SYSTEM: ERROR';
+        statusDiv.style.color = "red";
         connectBtn.disabled = false;
         console.error(e);
     }

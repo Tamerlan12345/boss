@@ -9,6 +9,7 @@ import os
 import asyncio
 import logging
 import re
+import json
 from dotenv import load_dotenv
 import numpy as np
 import torch
@@ -96,15 +97,19 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         # Dos System Instruction
         system_instruction = (
-            "You are Dos, a helpful AI assistant. "
-            "MODE: AUDIO-ONLY. "
-            "CRITICAL RULE: NEVER output text thoughts, internal monologue, or explanations. "
-            "Output ONLY raw audio for the user to hear. "
-            "BEHAVIOR: You are listening to a conversation. "
-            "ACTIVATION: Speak ONLY if the user explicitly says 'Dos' at the start. "
-            "If 'Dos' is not heard, output NOTHING (silence). "
-            "IDENTITY: If asked 'Who are you?', say exactly: 'Я ИИ спикер Dos'. "
-            "LANGUAGE: Speak Russian. "
+            "You are Dos, an expert AI assistant and passive analyst. "
+            "ROLE: Deep Dive Expert. Engage in deep analytical discussion. "
+            "MODE: AUDIO-ONLY (Speech-to-Speech). "
+            "CRITICAL RULE: NEVER output text thoughts, internal monologue, or explanations in the audio stream. "
+            "ACTIVATION: You are listening to a conversation. "
+            "IF the user's input explicitly starts with or contains the name 'Dos' (or 'Дос'): "
+            "  - Generate a comprehensive, structured, and expert-level audio response in Russian. "
+            "  - Use the full context of the conversation. "
+            "IF the name 'Dos' is NOT heard: "
+            "  - Output EXACTLY the text token: [SILENCE] "
+            "  - Do NOT generate any audio. "
+            "IDENTITY: 'Я ИИ спикер Dos'. "
+            "LANGUAGE: Russian. "
             "Speak clearly, with a moderate pace, articulating words distinctively to ensure good lip-sync."
         )
         await gemini_client.connect(system_instruction=system_instruction)
@@ -145,10 +150,15 @@ async def websocket_endpoint(websocket: WebSocket):
             loop = asyncio.get_running_loop()
             audio_buffer = bytearray()
             MIN_CHUNK_SIZE = 4096 # Accumulate at least 4KB to reduce jitter
+            is_silenced = False
 
             try:
                 async for chunk in gemini_client.receive():
                     if isinstance(chunk, bytes):
+                        # If silenced, we ignore audio chunks
+                        if is_silenced:
+                            continue
+
                         # Gemini Native Audio is 24kHz PCM.
                         # We must resample to 16kHz for the frontend/Simli.
                         # Using run_in_executor for CPU-bound resampling task.
@@ -162,11 +172,23 @@ async def websocket_endpoint(websocket: WebSocket):
                                 audio_buffer.clear()
 
                     elif isinstance(chunk, str):
-                        # If we receive text (e.g. metadata or transcript), we just log it
-                        logger.info(f"Received text from Gemini: {chunk}")
+                        # Check for [SILENCE] token
+                        if "[SILENCE]" in chunk:
+                            is_silenced = True
+                            audio_buffer.clear()
+                            logger.info("Silence token received. Muting audio.")
+                        else:
+                            if chunk.strip():
+                                # Received valid text, assume we are not silenced (or new turn)
+                                is_silenced = False
+
+                            # Send text log to frontend
+                            log_msg = {"type": "log", "role": "ai", "text": chunk}
+                            await websocket.send_text(json.dumps(log_msg))
+                            logger.info(f"Received text from Gemini: {chunk}")
 
                 # Flush remaining audio in buffer
-                if len(audio_buffer) > 0:
+                if len(audio_buffer) > 0 and not is_silenced:
                     await websocket.send_bytes(bytes(audio_buffer))
 
             except Exception as e:
