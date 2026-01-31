@@ -99,7 +99,7 @@ async def websocket_endpoint(websocket: WebSocket):
         system_instruction = (
             "You are Dos, an expert AI assistant and passive analyst. "
             "ROLE: Deep Dive Expert. Engage in deep analytical discussion. "
-            "MODE: AUDIO-ONLY (Speech-to-Speech). "
+            "MODE: AUDIO-ONLY. "
             "CRITICAL RULE: NEVER output text thoughts, internal monologue, or explanations in the audio stream. "
             "ACTIVATION: You are listening to a conversation. "
             "IF the user's input explicitly starts with or contains the name 'Dos' (or 'Дос'): "
@@ -119,7 +119,6 @@ async def websocket_endpoint(websocket: WebSocket):
         await asyncio.sleep(1.5)
 
         # Trigger Welcome Message
-        # The assistant must initiate the dialogue.
         await gemini_client.send_text(
             'Generate audio immediately. Say exactly this phrase with energy: '
             '"Я ИИ спикер Dos. Сегодня я буду вместе с вами разбирать и участвовать в теме обсуждения, которую вы зададите."'
@@ -159,14 +158,12 @@ async def websocket_endpoint(websocket: WebSocket):
                         if is_silenced:
                             continue
 
-                        # Gemini Native Audio is 24kHz PCM.
-                        # We must resample to 16kHz for the frontend/Simli.
-                        # Using run_in_executor for CPU-bound resampling task.
+                        # Gemini Native Audio is 24kHz PCM. Resample to 16kHz.
                         resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
                         if resampled_audio:
                             audio_buffer.extend(resampled_audio)
 
-                            # Send only when we have enough data (Simli buffering)
+                            # Send only when we have enough data
                             if len(audio_buffer) >= MIN_CHUNK_SIZE:
                                 await websocket.send_bytes(bytes(audio_buffer))
                                 audio_buffer.clear()
@@ -179,15 +176,16 @@ async def websocket_endpoint(websocket: WebSocket):
                             logger.info("Silence token received. Muting audio.")
                         else:
                             if chunk.strip():
-                                # Received valid text, assume we are not silenced (or new turn)
                                 is_silenced = False
 
-                            # Send text log to frontend
+                            # ИСПРАВЛЕНИЕ ЗДЕСЬ: ensure_ascii=True (по умолчанию)
+                            # Это превращает русские буквы в \uXXXX, что безопасно для WebSocket.
+                            # Браузер (JS) автоматически раскодирует это обратно в текст.
                             log_msg = {"type": "log", "role": "ai", "text": chunk}
-                            await websocket.send_text(json.dumps(log_msg, ensure_ascii=False))
+                            await websocket.send_text(json.dumps(log_msg))
                             logger.info(f"Received text from Gemini: {chunk}")
 
-                # Flush remaining audio in buffer
+                # Flush remaining audio
                 if len(audio_buffer) > 0 and not is_silenced:
                     await websocket.send_bytes(bytes(audio_buffer))
 
@@ -206,4 +204,8 @@ async def websocket_endpoint(websocket: WebSocket):
             pass
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=port, ws="wsproto")
+    # Определяем порт для облачной среды (Railway/Heroku)
+    port = int(os.getenv("PORT", 8080))
+    # Запускаем сервер. Можно убрать ws="wsproto", если библиотека не установлена, 
+    # так как fix с ensure_ascii=True решает проблему кодировки на уровне данных.
+    uvicorn.run(app, host="0.0.0.0", port=port)
