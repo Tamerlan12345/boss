@@ -184,7 +184,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
                             # Send text log to frontend
                             log_msg = {"type": "log", "role": "ai", "text": chunk}
-                            await websocket.send_text(json.dumps(log_msg))
+                            await websocket.send_text(json.dumps(log_msg, ensure_ascii=False))
                             logger.info(f"Received text from Gemini: {chunk}")
 
                 # Flush remaining audio in buffer
