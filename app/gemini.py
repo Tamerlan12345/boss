@@ -31,7 +31,7 @@ class GeminiClient:
             "setup": {
                 "model": "models/gemini-2.5-flash-native-audio-latest",
                 "generationConfig": {
-                    "responseModalities": ["AUDIO"],
+                    "responseModalities": ["AUDIO", "TEXT"],
                     "speechConfig": {
                         "voiceConfig": {
                             "prebuiltVoiceConfig": {

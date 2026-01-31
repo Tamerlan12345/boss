@@ -35,7 +35,7 @@ class TestGeminiLogic(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(setup.get("model"), "models/gemini-2.5-flash-native-audio-latest")
 
             gen_config = setup.get("generationConfig", {})
-            self.assertEqual(gen_config.get("responseModalities"), ["AUDIO"])
+            self.assertEqual(gen_config.get("responseModalities"), ["AUDIO", "TEXT"])
 
             speech_config = gen_config.get("speechConfig", {})
             voice_name = speech_config.get("voiceConfig", {}).get("prebuiltVoiceConfig", {}).get("voiceName")
@@ -44,7 +44,7 @@ class TestGeminiLogic(unittest.IsolatedAsyncioTestCase):
     def test_main_loop_filtering(self):
         """
         Verify that app.main.send_to_client:
-        1. Ignores str (text) chunks.
+        1. Logs str (text) chunks as JSON.
         2. Resamples and sends bytes (audio) chunks.
         """
         # We simulate the GeminiClient instance behavior
@@ -78,18 +78,17 @@ class TestGeminiLogic(unittest.IsolatedAsyncioTestCase):
                 # The endpoint calls gemini_client.connect, send_text(welcome), then starts loops.
                 # send_to_client loop will iterate mock_receive_gen()
 
-                # We expect to receive ONE binary message: b"audio_raw_resampled"
-                # The text "ignore this text" should produce NO output.
+                # We expect to receive the text log first
+                log_data = websocket.receive_text()
+                log_json = json.loads(log_data)
+                self.assertEqual(log_json.get("type"), "log")
+                self.assertEqual(log_json.get("text"), "ignore this text")
 
+                # Then we expect to receive ONE binary message: b"audio_raw_resampled"
                 data = websocket.receive_bytes()
                 self.assertEqual(data, b"audio_raw_resampled")
 
-                # If the text was sent, the TestClient would have likely raised an error
-                # (since we called receive_bytes, and if it got text it complains)
-                # OR it would be queued.
-
                 # To be absolutely sure, we assert that mock_resampler was called exactly once.
-                # If text was processed as audio, it would be called twice (or fail).
                 self.assertEqual(mock_resampler.call_count, 1)
                 mock_resampler.assert_called_with(b"audio_raw")
 

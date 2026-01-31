@@ -3,33 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dos AI Assistant</title>
-    <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background-color: #f0f0f0; }
-        #controls { margin-bottom: 20px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-        #status { margin-bottom: 20px; font-weight: bold; }
-        canvas { width: 100%; max-width: 600px; height: 100px; background: #333; border-radius: 8px; }
-        #logs { width: 100%; max-width: 600px; height: 200px; overflow-y: auto; background: white; border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
-        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #eee; }
-    </style>
+    <title>Dos AI Assistant - Neural Terminal</title>
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <h1>Dos AI Assistant</h1>
+    <div class="scanline"></div>
 
-    <div id="controls">
-        <button id="connectBtn" disabled>Connect</button>
-        <button id="disconnectBtn" disabled>Disconnect</button>
+    <h1>DOS :: NEURAL INTERFACE</h1>
+
+    <div class="main-terminal">
+        <!-- Left: Avatar & Controls -->
+        <div class="avatar-section">
+            <div class="avatar-frame" id="avatarFrame">
+                <video id="simli-video" poster="/static/avatar.png" autoplay playsinline></video>
+                <audio id="simli-audio" autoplay></audio>
+            </div>
+
+            <div class="controls">
+                <div id="status">DISCONNECTED</div>
+                <div class="controls-row">
+                    <button id="connectBtn">Connect System</button>
+                    <button id="disconnectBtn" disabled>Disconnect</button>
+                </div>
+                <!-- Visualizer placeholder -->
+                <canvas id="audio-visualizer" width="500" height="60"></canvas>
+            </div>
+        </div>
+
+        <!-- Right: Logs -->
+        <div class="logs-section">
+            <div class="logs-header">
+                <span>NEURAL_LOG://STREAM_01</span>
+                <span>STATUS: ACTIVE</span>
+            </div>
+            <div id="logs" class="logs-content">
+                <!-- Log entries will appear here -->
+            </div>
+        </div>
     </div>
-
-    <div id="status">Disconnected</div>
-
-    <div id="avatar-container" style="position: relative; width: 400px; height: 400px; margin: 0 auto 20px auto;">
-        <video id="simli-video" poster="/static/avatar.png" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-        <audio id="simli-audio" autoplay></audio>
-    </div>
-
-    <div id="logs"></div>
 
     <script type="module" src="/static/js/main.js"></script>
 </body>
