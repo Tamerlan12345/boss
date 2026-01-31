@@ -81,7 +81,6 @@ async def websocket_endpoint(websocket: WebSocket):
     loop = asyncio.get_running_loop()
 
     try:
-        # System Instruction
         system_instruction = (
             "You are Dos, an expert AI assistant and passive analyst. "
             "ROLE: Deep Dive Expert. Engage in deep analytical discussion. "
@@ -99,42 +98,55 @@ async def websocket_endpoint(websocket: WebSocket):
             "Speak clearly, with a moderate pace, articulating words distinctively to ensure good lip-sync."
         )
         
-        # 1. Сначала подключаемся к Gemini
         await gemini_client.connect(system_instruction=system_instruction)
 
-        # 2. Определяем задачи, но не запускаем блокирующий sleep в главном потоке!
-        
         async def receive_from_client():
-            """Читает микрофон постоянно, чтобы не забивать буфер"""
+            """Читает микрофон. Использует raw receive() для защиты от ошибок типов."""
             nonlocal current_speaker
             try:
                 while True:
-                    data = await websocket.receive_bytes()
-                    # Отправляем в Gemini (он будет буферизировать, пока мы не слушаем ответ)
-                    speaker = await loop.run_in_executor(None, identifier.process_chunk, data)
-                    if speaker and speaker != current_speaker:
-                        current_speaker = speaker
-                        logger.info(f"Speaker changed to: {speaker}")
-                        await gemini_client.send_text(f"[User Changed: {speaker}]")
+                    # Используем receive() вместо receive_bytes(), чтобы проверить тип кадра
+                    message = await websocket.receive()
                     
-                    await gemini_client.send_audio(data)
+                    if message["type"] == "websocket.disconnect":
+                        logger.info("Client disconnected (Event)")
+                        break
+                    
+                    if message["type"] == "websocket.receive":
+                        if "bytes" in message and message["bytes"]:
+                            data = message["bytes"]
+                            
+                            # Обработка спикера
+                            speaker = await loop.run_in_executor(None, identifier.process_chunk, data)
+                            if speaker and speaker != current_speaker:
+                                current_speaker = speaker
+                                logger.info(f"Speaker changed to: {speaker}")
+                                await gemini_client.send_text(f"[User Changed: {speaker}]")
+                            
+                            # Отправка аудио в Gemini
+                            await gemini_client.send_audio(data)
+                        
+                        elif "text" in message:
+                            # Игнорируем текстовые сообщения от клиента, чтобы не крашить сокет
+                            pass
+
             except WebSocketDisconnect:
-                logger.info("Client disconnected (Receive Loop)")
+                logger.info("Client disconnected (Exception)")
             except Exception as e:
                 logger.error(f"Error receiving from client: {e}")
 
         async def send_to_client():
-            """Отвечает за Simli и отправку ответов"""
+            """Отправляет ответы клиенту."""
             loop = asyncio.get_running_loop()
             audio_buffer = bytearray()
             MIN_CHUNK_SIZE = 4096
             is_silenced = False
 
-            # ПАУЗА ЗДЕСЬ - внутри асинхронной задачи, не блокируя чтение!
+            # Пауза для Simli
             logger.info("Pausing for Simli stabilization...")
             await asyncio.sleep(1.5)
 
-            # Приветственное сообщение
+            # Приветствие
             await gemini_client.send_text(
                 'Generate audio immediately. Say exactly this phrase with energy: '
                 '"Я ИИ спикер Dos. Сегодня я буду вместе с вами разбирать и участвовать в теме обсуждения, которую вы зададите."'
@@ -158,9 +170,9 @@ async def websocket_endpoint(websocket: WebSocket):
                             logger.info("Silence token received.")
                         else:
                             if chunk.strip(): is_silenced = False
-                            # Отправляем JSON (ASCII-safe)
+                            # Отправляем JSON без ensure_ascii=False (безопасно для сокетов)
                             log_msg = {"type": "log", "role": "ai", "text": chunk}
-                            await websocket.send_text(json.dumps(log_msg)) # ensure_ascii=True по умолчанию
+                            await websocket.send_text(json.dumps(log_msg)) 
                             logger.info(f"Received text: {chunk}")
 
                 if len(audio_buffer) > 0 and not is_silenced:
@@ -169,7 +181,7 @@ async def websocket_endpoint(websocket: WebSocket):
             except Exception as e:
                 logger.error(f"Error sending to client: {e}")
 
-        # 3. Запускаем обе задачи параллельно
+        # Запускаем чтение и отправку параллельно
         await asyncio.gather(receive_from_client(), send_to_client())
 
     except Exception as e:
@@ -183,5 +195,5 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
-    # Используем wsproto (убедитесь, что он добавлен в requirements.txt)
-    uvicorn.run(app, host="0.0.0.0", port=port, ws="wsproto")
+    # УБРАЛИ ws="wsproto", чтобы использовать стандартную библиотеку
+    uvicorn.run(app, host="0.0.0.0", port=port)
