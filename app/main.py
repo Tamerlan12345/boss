@@ -136,7 +136,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.error(f"Error receiving from client: {e}")
 
         async def send_to_client():
-            """Отправляет ответы клиенту и поддерживает соединение (Ping)."""
+            """Отправляет ответы клиенту."""
             loop = asyncio.get_running_loop()
             audio_buffer = bytearray()
             MIN_CHUNK_SIZE = 4096
@@ -153,43 +153,27 @@ async def websocket_endpoint(websocket: WebSocket):
             )
 
             try:
-                # Превращаем поток (generator) в итератор, чтобы управлять ожиданием
-                iterator = gemini_client.receive().__aiter__()
-
-                while True:
-                    try:
-                        # Ждем данные максимум 5 секунд.
-                        # Если данных нет (Gemini молчит), сработает TimeoutError.
-                        chunk = await asyncio.wait_for(iterator.__anext__(), timeout=5.0)
-
-                        if isinstance(chunk, bytes):
-                            if is_silenced: continue
-                            resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
-                            if resampled_audio:
-                                audio_buffer.extend(resampled_audio)
-                                if len(audio_buffer) >= MIN_CHUNK_SIZE:
-                                    await websocket.send_bytes(bytes(audio_buffer))
-                                    audio_buffer.clear()
-
-                        elif isinstance(chunk, str):
-                            if "[SILENCE]" in chunk:
-                                is_silenced = True
+                # Стандартный цикл чтения (без прерываний)
+                async for chunk in gemini_client.receive():
+                    if isinstance(chunk, bytes):
+                        if is_silenced: continue
+                        resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
+                        if resampled_audio:
+                            audio_buffer.extend(resampled_audio)
+                            if len(audio_buffer) >= MIN_CHUNK_SIZE:
+                                await websocket.send_bytes(bytes(audio_buffer))
                                 audio_buffer.clear()
-                                logger.info("Silence token received.")
-                            else:
-                                if chunk.strip(): is_silenced = False
-                                log_msg = {"type": "log", "role": "ai", "text": chunk}
-                                await websocket.send_text(json.dumps(log_msg)) 
-                                logger.info(f"Received text: {chunk}")
 
-                    except asyncio.TimeoutError:
-                        # ВАЖНО: Если 5 секунд тишина, отправляем пинг,
-                        # чтобы соединение не разорвалось (ошибка 1011)
-                        await websocket.send_text(json.dumps({"type": "ping"}))
-                    
-                    except StopAsyncIteration:
-                        # Поток данных закончился
-                        break
+                    elif isinstance(chunk, str):
+                        if "[SILENCE]" in chunk:
+                            is_silenced = True
+                            audio_buffer.clear()
+                            logger.info("Silence token received.")
+                        else:
+                            if chunk.strip(): is_silenced = False
+                            log_msg = {"type": "log", "role": "ai", "text": chunk}
+                            await websocket.send_text(json.dumps(log_msg)) 
+                            logger.info(f"Received text: {chunk}")
 
                 # Отправляем остатки аудио
                 if len(audio_buffer) > 0 and not is_silenced:
@@ -198,8 +182,18 @@ async def websocket_endpoint(websocket: WebSocket):
             except Exception as e:
                 logger.error(f"Error sending to client: {e}")
 
-        # Запускаем чтение и отправку параллельно
-        await asyncio.gather(receive_from_client(), send_to_client())
+        async def keep_alive():
+            """Фоновая задача: отправляет пинг каждые 5 секунд, чтобы канал не умер."""
+            try:
+                while True:
+                    await asyncio.sleep(5)
+                    # Шлем пинг, чтобы облако/браузер не разорвали соединение (Error 1011)
+                    await websocket.send_text(json.dumps({"type": "ping"}))
+            except Exception:
+                pass
+
+        # Запускаем ВСЕ задачи параллельно: чтение микрофона, отправку звука и пинги
+        await asyncio.gather(receive_from_client(), send_to_client(), keep_alive())
 
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
