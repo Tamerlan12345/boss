@@ -2,18 +2,18 @@
 
 :root {
     /* Палитра: Deep Dark & Electric Cyan */
-    --bg-dark: #050509;          /* Почти черный с синим отливом */
+    --bg-dark: #050509;           /* Почти черный с синим отливом */
     
     /* Акцентные цвета */
-    --accent-cyan: #00E5FF;      /* Яркий неон */
-    --accent-blue: #0066FF;      /* Глубокий синий */
+    --accent-cyan: #00E5FF;       /* Яркий неон */
+    --accent-blue: #0066FF;       /* Глубокий синий */
     
     /* Градиент (CFO Button Style) */
     --blue-gradient: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%);
     
     /* Текста */
     --text-white: #FFFFFF;
-    --text-grey: #9aa0b0;        /* Холодный серый */
+    --text-grey: #9aa0b0;         /* Холодный серый */
     
     /* Стекло и Свечения */
     --glass-bg: rgba(15, 18, 25, 0.70); /* Темное стекло */
@@ -150,6 +150,7 @@ body {
     display: flex; flex-direction: column; gap: 15px;
 }
 
+/* ОБНОВЛЕНО: Статус бар с иконкой */
 #status {
     font-family: 'Montserrat', sans-serif;
     color: var(--text-grey);
@@ -157,6 +158,25 @@ body {
     font-size: 11px; font-weight: 600; 
     letter-spacing: 2px;
     text-transform: uppercase;
+    
+    /* Flex для выравнивания иконки и текста */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px; /* Отступ между иконкой и текстом */
+}
+
+/* НОВОЕ: Стиль для иконки в статусе */
+.status-icon {
+    height: 16px; /* Компактный размер */
+    width: auto;
+    opacity: 0.8;
+    filter: drop-shadow(0 0 5px rgba(0, 229, 255, 0.4)); 
+    transition: opacity 0.3s ease;
+}
+.status-icon:hover {
+    opacity: 1; 
+    filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.8)); 
 }
 
 .controls-row {
@@ -223,18 +243,6 @@ button {
     border-bottom: 1px solid rgba(255,255,255,0.08);
     font-size: 10px; letter-spacing: 1.5px; 
     font-weight: 700; color: var(--text-grey);
-}
-
-/* Центральная иконка в хедере логов */
-.header-icon {
-    height: 24px;
-    width: auto;
-    opacity: 0.8;
-    filter: drop-shadow(0 0 5px rgba(0, 229, 255, 0.4)); 
-    transition: opacity 0.3s ease;
-}
-.header-icon:hover {
-    opacity: 1; filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.8)); 
 }
 
 /* Статус "Active" */
