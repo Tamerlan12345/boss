@@ -1,22 +1,29 @@
+/* --- CFO Summit Premium Electric Style --- */
+
 :root {
-    /* --- Палитра CFO Summit Blue --- */
-    --bg-dark: #050509;          /* Глубокий черно-синий фон */
+    /* Палитра: Deep Dark & Electric Cyan */
+    --bg-dark: #050509;          /* Почти черный с синим отливом */
     
-    /* Электрический синий градиент */
-    --accent-cyan: #00E5FF;      /* Яркий голубой */
+    /* Акцентные цвета */
+    --accent-cyan: #00E5FF;      /* Яркий неон */
     --accent-blue: #0066FF;      /* Глубокий синий */
+    
+    /* Градиент (CFO Button Style) */
     --blue-gradient: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%);
     
+    /* Текста */
     --text-white: #FFFFFF;
     --text-grey: #9aa0b0;        /* Холодный серый */
     
-    /* Эффекты стекла и свечения */
-    --glass-bg: rgba(15, 18, 25, 0.75); /* Темное "дорогое" стекло */
-    --glass-border: 1px solid rgba(0, 229, 255, 0.15); /* Еле заметная голубая рамка */
-    --glow-blue-soft: 0 0 30px rgba(0, 102, 255, 0.25); /* Мягкое свечение для видео */
-    --glow-blue-sharp: 0 0 15px rgba(0, 229, 255, 0.5); /* Резкое свечение для текста */
+    /* Стекло и Свечения */
+    --glass-bg: rgba(15, 18, 25, 0.70); /* Темное стекло */
+    --glass-border: 1px solid rgba(0, 229, 255, 0.12); /* Тонкая рамка */
+    
+    --glow-soft: 0 0 30px rgba(0, 102, 255, 0.20); /* Мягкое свечение видео */
+    --glow-text: 0 0 15px rgba(0, 229, 255, 0.5);  /* Свечение текста */
 }
 
+/* Сброс стилей */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -26,7 +33,7 @@
 body {
     background-color: var(--bg-dark);
     color: var(--text-white);
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Montserrat', sans-serif; /* Основной шрифт */
     height: 100vh;
     overflow: hidden;
     display: flex;
@@ -34,25 +41,28 @@ body {
     align-items: center;
     justify-content: center;
     position: relative;
-    /* Добавляем виньетку для глубины */
-    background-image: radial-gradient(circle at center, rgba(0, 30, 60, 0.2) 0%, var(--bg-dark) 80%);
+    /* Виньетка для глубины */
+    background-image: radial-gradient(circle at center, rgba(0, 30, 60, 0.15) 0%, var(--bg-dark) 85%);
 }
 
-/* --- Фоны --- */
+/* Скрываем старые элементы */
+.scanline { display: none; }
+
+/* --- 1. Фоновые элементы --- */
 .bg-watermark {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
     background-image: url('https://cfo.kgforum.kz/assets/about-butterfly-BvsDo2Y0.webp');
     background-repeat: no-repeat;
-    background-position: center 60%; /* Чуть ниже центра */
+    background-position: center 60%;
     background-size: 65%;
-    opacity: 0.15; /* Еле заметно, для текстуры */
-    filter: grayscale(100%) contrast(120%); /* Делаем Ч/Б, чтобы не спорила с синим */
+    opacity: 0.12; /* Очень деликатно */
+    filter: grayscale(100%) contrast(120%); /* Ч/Б стиль */
     z-index: 0;
     pointer-events: none;
 }
 
-/* --- Логотип --- */
+/* --- 2. Верхний Логотип --- */
 .logo-container {
     z-index: 10;
     margin-bottom: 2.5rem;
@@ -61,33 +71,35 @@ body {
 .main-logo {
     max-width: 240px;
     height: auto;
-    /* Легкое свечение логотипа */
-    filter: drop-shadow(0 0 20px rgba(0,0,0,0.8)); 
+    filter: drop-shadow(0 4px 20px rgba(0,0,0,0.8));
 }
 
-/* --- Основной Терминал (Стекло) --- */
+/* --- 3. Основной Терминал (Стекло) --- */
 .main-terminal {
     position: relative;
     width: 90%;
     max-width: 1150px;
-    height: 68vh;
+    height: 70vh;
     
-    /* Эффект дорогого стекла */
+    /* Эффект Glassmorphism */
     background: var(--glass-bg);
-    backdrop-filter: blur(25px) saturate(110%); 
+    backdrop-filter: blur(20px) saturate(110%);
     border: var(--glass-border);
     border-radius: 12px;
-    /* Комбинация теней для объема */
-    box-shadow: 0 30px 60px rgba(0,0,0,0.7), inset 0 0 30px rgba(0, 50, 100, 0.1);
+    
+    /* Сложные тени для объема */
+    box-shadow: 
+        0 40px 80px rgba(0,0,0,0.6), 
+        inset 0 0 40px rgba(0, 50, 100, 0.05);
     z-index: 10;
 }
 
-/* Декоративные уголки (Тонкие акценты) */
+/* Декоративные уголки */
 .corner {
     position: absolute;
     width: 15px; height: 15px;
-    border: 1px solid var(--accent-cyan); /* Очень тонкие */
-    opacity: 0.6;
+    border: 1px solid var(--accent-cyan);
+    opacity: 0.5;
     z-index: 20;
     border-radius: 1px;
 }
@@ -102,7 +114,7 @@ body {
     padding: 35px; gap: 40px;
 }
 
-/* --- Левая часть: Выделение Видео --- */
+/* --- 4. Левая колонка (Видео) --- */
 .avatar-section {
     flex: 0 0 420px;
     display: flex; flex-direction: column; gap: 25px;
@@ -112,11 +124,12 @@ body {
     flex-grow: 1;
     position: relative;
     background: #000;
-    border-radius: 8px;
+    border-radius: 6px;
     overflow: hidden;
-    /* ВЫДЕЛЕНИЕ СТРИМА: Синяя рамка и мягкое свечение */
+    
+    /* Акцент на стрим (Focal Point) */
     border: 1px solid var(--accent-cyan);
-    box-shadow: var(--glow-blue-soft); 
+    box-shadow: var(--glow-soft);
 }
 
 #simli-video {
@@ -124,14 +137,15 @@ body {
     opacity: 0.95;
 }
 
+/* LIVE BADGE */
 .live-badge {
     position: absolute; top: 15px; right: 15px;
     color: var(--accent-cyan);
     font-size: 10px; font-weight: 800; letter-spacing: 1px;
-    text-shadow: 0 0 8px var(--accent-cyan);
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
 }
 
-/* --- Контроллеры --- */
+/* --- 5. Панель управления --- */
 .controls {
     display: flex; flex-direction: column; gap: 15px;
 }
@@ -139,7 +153,9 @@ body {
 #status {
     font-family: 'Montserrat', sans-serif;
     color: var(--text-grey);
-    text-align: center; font-size: 11px; font-weight: 600; letter-spacing: 2px;
+    text-align: center; 
+    font-size: 11px; font-weight: 600; 
+    letter-spacing: 2px;
     text-transform: uppercase;
 }
 
@@ -150,26 +166,27 @@ body {
 button {
     flex: 1; padding: 16px;
     font-family: 'Montserrat', sans-serif;
-    font-weight: 800; /* Очень жирный шрифт, как на сайте */
-    text-transform: uppercase; font-size: 12px; letter-spacing: 1px;
+    font-weight: 800; /* Extra Bold */
+    text-transform: uppercase; 
+    font-size: 12px; letter-spacing: 1px;
     cursor: pointer; border: none; border-radius: 4px;
     transition: all 0.3s ease;
 }
 
-/* Основная кнопка (Синий градиент CFO) */
+/* Главная кнопка (Градиент) */
 .primary-btn {
     background: var(--blue-gradient);
-    background-size: 150% auto; /* Для анимации */
+    background-size: 150% auto;
     color: #FFF;
-    box-shadow: 0 5px 20px rgba(0, 102, 255, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 102, 255, 0.3);
 }
 .primary-btn:hover {
-    background-position: right center; /* Перелив градиента */
+    background-position: right center;
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 102, 255, 0.5);
+    box-shadow: 0 6px 20px rgba(0, 102, 255, 0.5);
 }
 
-/* Вторичная кнопка (Прозрачная) */
+/* Вторичная кнопка */
 .secondary-btn {
     background: rgba(255,255,255,0.03);
     color: var(--text-white);
@@ -184,53 +201,69 @@ button {
     opacity: 0.4; cursor: not-allowed;
 }
 
-/* --- Правая часть: Логи --- */
+/* Визуализатор */
+#audio-visualizer {
+    width: 100%; background: transparent;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    opacity: 0.7;
+}
+
+/* --- 6. Правая колонка (Логи) --- */
 .logs-section {
     flex: 1; display: flex; flex-direction: column;
-    border-left: 1px solid rgba(255,255,255,0.08); /* Очень тонкий разделитель */
+    border-left: 1px solid rgba(255,255,255,0.08); /* Тонкая линия */
     padding-left: 30px;
 }
 
 .logs-header {
-    display: flex; justify-content: space-between;
+    display: flex;
+    justify-content: space-between;
+    align-items: center; /* Центрирование по вертикали */
     padding-bottom: 15px; margin-bottom: 20px;
     border-bottom: 1px solid rgba(255,255,255,0.08);
-    font-size: 10px; letter-spacing: 1.5px; font-weight: 700; color: var(--text-grey);
+    font-size: 10px; letter-spacing: 1.5px; 
+    font-weight: 700; color: var(--text-grey);
 }
 
-/* Активный статус с синим свечением */
+/* Центральная иконка в хедере логов */
+.header-icon {
+    height: 24px;
+    width: auto;
+    opacity: 0.8;
+    filter: drop-shadow(0 0 5px rgba(0, 229, 255, 0.4)); 
+    transition: opacity 0.3s ease;
+}
+.header-icon:hover {
+    opacity: 1; filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.8)); 
+}
+
+/* Статус "Active" */
 .status-active {
     color: var(--accent-cyan);
-    text-shadow: var(--glow-blue-sharp);
+    text-shadow: var(--glow-text);
+    font-weight: 700;
 }
 
 .logs-content {
     flex-grow: 1; overflow-y: auto;
     font-family: 'Montserrat', sans-serif;
     font-size: 14px; line-height: 1.7;
-    color: #E0E0E0; font-weight: 400;
+    color: #E0E0E0; font-weight: 400; /* Читаемый, легкий текст */
 }
 
-/* Тонкий скроллбар */
+/* Кастомный скроллбар */
 .logs-content::-webkit-scrollbar { width: 4px; }
 .logs-content::-webkit-scrollbar-track { background: transparent; }
 .logs-content::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 .logs-content::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
 
-/* Визуализатор аудио */
-#audio-visualizer {
-    width: 100%; background: transparent;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    opacity: 0.6; /* Чуть приглушить */
-}
-
-/* --- Адаптив --- */
+/* --- Адаптивность --- */
 @media (max-width: 900px) {
     .main-terminal { height: auto; flex-direction: column; }
     .terminal-body { flex-direction: column; padding: 25px; gap: 25px;}
     .avatar-section { flex: none; width: 100%; height: 320px; }
     .logs-section { border-left: none; border-top: 1px solid rgba(255,255,255,0.1); padding-left: 0; padding-top: 25px; height: 300px;}
-    .bg-watermark { background-size: 90%; opacity: 0.1; }
-    .logo-container { margin-bottom: 1.5rem; }
-    .main-logo { max-width: 200px; }
+    .bg-watermark { background-size: 90%; opacity: 0.08; }
+    .main-logo { max-width: 180px; }
+    .live-badge { font-size: 9px; }
 }
