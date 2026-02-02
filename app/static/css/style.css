@@ -1,4 +1,16 @@
-/* --- Сброс и Базовые настройки --- */
+/* --- 1. Глобальные настройки --- */
+:root {
+    /* Палитра CFO Summit */
+    --bg-dark: #050505;       /* Очень глубокий черный */
+    --text-white: #FFFFFF;
+    --text-grey: #8E8E93;     /* Apple-style grey для второстепенного текста */
+    --border-light: rgba(255, 255, 255, 0.12); /* Очень тонкие разделители */
+    
+    /* Золотой градиент (как на наградах и кнопках CFO) */
+    --gold-gradient: linear-gradient(135deg, #CF9D4E 0%, #F5D061 50%, #CF9D4E 100%);
+    --gold-glow: 0 4px 20px rgba(207, 157, 78, 0.3);
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -6,8 +18,8 @@
 }
 
 body {
-    background-color: #111111; /* Primary Dark */
-    color: #FFFFFF; /* Secondary White */
+    background-color: var(--bg-dark);
+    color: var(--text-white);
     font-family: 'Montserrat', sans-serif;
     height: 100vh;
     display: flex;
@@ -15,75 +27,76 @@ body {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    
-    /* Фоновое изображение (Бабочка) - красиво и лаконично */
+
+    /* Фоновая бабочка (Watermark) */
     background-image: url('https://cfo.kgforum.kz/assets/about-butterfly-BvsDo2Y0.webp');
     background-repeat: no-repeat;
-    background-position: center bottom; /* Располагаем внизу или по центру */
-    background-size: contain; /* Чтобы она вписывалась */
-    background-blend-mode: soft-light; /* Смешивание с черным фоном */
+    background-position: center bottom -50px; /* Чуть ниже, чтобы не мешать контенту */
+    background-size: 60%; /* Не слишком огромная */
+    background-blend-mode: luminosity; /* Делает её более строгой/монохромной */
 }
 
-/* Скрываем ретро-эффект сканлайна */
-.scanline {
-    display: none;
-}
+/* Скрываем ретро-линии */
+.scanline { display: none; }
 
-/* --- Заголовок и Логотип --- */
+/* --- 2. Логотип --- */
 h1 {
     width: 100%;
     text-align: center;
-    margin-bottom: 2rem;
-    z-index: 2; /* Поверх фона */
+    margin-bottom: 30px;
+    z-index: 10;
 }
 
 .main-logo {
-    max-width: 250px; /* Оптимальный размер логотипа */
+    max-width: 220px;
     height: auto;
-    display: block;
-    margin: 0 auto;
+    filter: drop-shadow(0 0 10px rgba(0,0,0,0.5)); /* Тень, чтобы читался на любом фоне */
 }
 
-/* --- Основной контейнер --- */
+/* --- 3. Основной контейнер (Стекло) --- */
 .main-terminal {
     display: flex;
-    gap: 40px; /* Больше воздуха между колонками */
+    gap: 40px;
     width: 90%;
-    max-width: 1200px;
-    height: 70vh;
+    max-width: 1100px;
+    height: 65vh;
     z-index: 2;
-    background: rgba(17, 17, 17, 0.85); /* Полупрозрачный черный фон для читаемости */
-    backdrop-filter: blur(10px); /* Эффект матового стекла (Premium feel) */
-    border: 1px solid #333; /* Тонкий дивайдер */
+    
+    /* Эффект дорогого стекла */
+    background: rgba(20, 20, 20, 0.6);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-light);
+    border-radius: 16px; /* Современные скругления */
     padding: 40px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
 }
 
-/* --- Левая секция: Аватар и кнопки --- */
+/* --- 4. Левая секция (Аватар) --- */
 .avatar-section {
-    flex: 1;
+    flex: 0 0 400px; /* Фиксированная ширина для левой колонки */
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 25px;
 }
 
-/* Рамка аватара */
 .avatar-frame {
     flex-grow: 1;
     background: #000;
-    border: 1px solid #333; /* Тонкая рамка вместо "трубы" */
-    position: relative;
+    border-radius: 12px;
+    border: 1px solid var(--border-light);
     overflow: hidden;
-    /* Убрали скругления для строгости, либо делаем минимальные */
-    border-radius: 4px; 
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
 }
 
 #simli-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    opacity: 0.9; /* Чуть приглушаем видео, чтобы не было пересвета */
 }
 
-/* --- Панель управления --- */
+/* --- 5. Контроллеры --- */
 .controls {
     display: flex;
     flex-direction: column;
@@ -91,9 +104,10 @@ h1 {
 }
 
 #status {
-    font-size: 12px;
-    letter-spacing: 2px;
-    color: #666; /* Neutral Grey */
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--text-grey);
     text-align: center;
     font-weight: 600;
 }
@@ -101,107 +115,133 @@ h1 {
 .controls-row {
     display: flex;
     gap: 15px;
-    justify-content: center;
 }
 
-/* --- Кнопки (Акцентный стиль) --- */
+/* --- 6. КНОПКИ (Самое важное изменение) --- */
 button {
-    background-color: #FDC300; /* Accent Yellow */
-    color: #111111; /* Темный текст для контраста */
+    flex: 1;
+    padding: 16px;
     border: none;
-    padding: 14px 28px;
     font-family: 'Montserrat', sans-serif;
     font-weight: 700;
+    font-size: 13px;
     text-transform: uppercase;
-    font-size: 14px;
+    letter-spacing: 1px;
     cursor: pointer;
+    border-radius: 8px;
     transition: all 0.3s ease;
-    border-radius: 2px; /* Минимальное скругление */
-    min-width: 140px;
 }
 
-button:hover {
-    background-color: #e0ac00; /* Чуть темнее при наведении */
-    transform: translateY(-2px); /* Легкий подъем */
+/* Кнопка START: Золотой градиент */
+#connectBtn {
+    background: var(--gold-gradient);
+    background-size: 200% auto; /* Для анимации градиента */
+    color: #111; /* Темный текст на золоте */
+    box-shadow: var(--gold-glow);
 }
 
-button:disabled {
-    background-color: #333;
-    color: #666;
+#connectBtn:hover {
+    background-position: right center; /* Перелив градиента при наведении */
+    transform: translateY(-2px);
+}
+
+/* Кнопка STOP: Прозрачная с обводкой */
+#disconnectBtn {
+    background: transparent;
+    color: var(--text-white);
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+#disconnectBtn:hover:not(:disabled) {
+    border-color: #FFF;
+    background: rgba(255,255,255,0.05);
+}
+
+#disconnectBtn:disabled {
+    opacity: 0.3;
     cursor: not-allowed;
-    transform: none;
 }
 
 /* Визуализатор аудио */
 #audio-visualizer {
     width: 100%;
-    height: 40px;
-    background: #000;
-    border-top: 2px solid #FDC300; /* Золотая линия сверху */
-    opacity: 0.8;
+    height: 30px;
+    /* Убрали фон, оставили только волну */
+    background: transparent;
+    border-bottom: 1px solid var(--border-light);
 }
 
-/* --- Правая секция: Логи --- */
+/* --- 7. Правая секция (Логи/Транскрипт) --- */
 .logs-section {
     flex: 1;
     display: flex;
     flex-direction: column;
-    border-left: 1px solid #333; /* Вертикальный разделитель */
-    padding-left: 40px;
-    font-family: 'Montserrat', sans-serif; /* Можно оставить monospace, но sans-serif премиальнее */
+    /* Убрали боковую рамку, сделали просто отступ */
+    padding-left: 20px; 
 }
 
 .logs-header {
     display: flex;
     justify-content: space-between;
-    border-bottom: 2px solid #FDC300; /* Золотой акцент */
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    color: #FFF;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-light); /* Тонкая белая линия */
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    color: var(--text-grey);
+    text-transform: uppercase;
+}
+
+/* Маркер "LIVE" */
+.logs-header span:last-child {
+    color: #F5D061; /* Золотой цвет текста */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.logs-header span:last-child::before {
+    content: '';
+    display: block;
+    width: 6px;
+    height: 6px;
+    background: #F5D061;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #F5D061;
 }
 
 .logs-content {
     flex-grow: 1;
     overflow-y: auto;
-    font-size: 14px;
-    line-height: 1.6;
-    color: #DDD; /* Чуть приглушенный белый */
+    font-size: 15px;
+    line-height: 1.7;
+    color: #E0E0E0;
+    font-weight: 300; /* Более тонкий шрифт, выглядит дороже */
 }
 
-/* Стилизация скроллбара для логов */
-.logs-content::-webkit-scrollbar {
-    width: 6px;
-}
-.logs-content::-webkit-scrollbar-track {
-    background: #111;
-}
-.logs-content::-webkit-scrollbar-thumb {
-    background: #333;
-}
-.logs-content::-webkit-scrollbar-thumb:hover {
-    background: #FDC300;
-}
+/* Скроллбар (тонкий и незаметный) */
+.logs-content::-webkit-scrollbar { width: 4px; }
+.logs-content::-webkit-scrollbar-track { background: transparent; }
+.logs-content::-webkit-scrollbar-thumb { background: #333; border-radius: 2px;}
 
-/* Адаптив для мобильных устройств */
+/* Мобильная версия */
 @media (max-width: 768px) {
     .main-terminal {
         flex-direction: column;
         height: auto;
         padding: 20px;
+        gap: 20px;
+    }
+    
+    .avatar-section {
+        flex: none;
+        width: 100%;
     }
     
     .logs-section {
-        border-left: none;
-        border-top: 1px solid #333;
         padding-left: 0;
+        height: 250px;
+        border-top: 1px solid var(--border-light);
         padding-top: 20px;
-        height: 200px; /* Фиксированная высота для логов на мобильном */
-    }
-    
-    body {
-        background-size: 150%; /* Увеличим бабочку на фоне */
     }
 }
