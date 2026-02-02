@@ -1,252 +1,207 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap');
-
-:root {
-    --bg-color: #050505;
-    --terminal-bg: rgba(10, 10, 18, 0.9);
-    --neon-cyan: #00f3ff;
-    --neon-pink: #bc13fe;
-    --acid-green: #39ff14;
-    --text-color: #e0e0e0;
-    --font-primary: 'Orbitron', sans-serif;
-    --font-mono: 'Roboto Mono', monospace;
+/* --- Сброс и Базовые настройки --- */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 body {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    font-family: var(--font-mono);
-    margin: 0;
-    padding: 20px;
+    background-color: #111111; /* Primary Dark */
+    color: #FFFFFF; /* Secondary White */
+    font-family: 'Montserrat', sans-serif;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: 100vh;
+    justify-content: center;
     overflow: hidden;
-    position: relative;
+    
+    /* Фоновое изображение (Бабочка) - красиво и лаконично */
+    background-image: url('https://cfo.kgforum.kz/assets/about-butterfly-BvsDo2Y0.webp');
+    background-repeat: no-repeat;
+    background-position: center bottom; /* Располагаем внизу или по центру */
+    background-size: contain; /* Чтобы она вписывалась */
+    background-blend-mode: soft-light; /* Смешивание с черным фоном */
 }
 
-/* Grid Background Effect */
-body::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background:
-        linear-gradient(transparent 95%, rgba(0, 243, 255, 0.1) 95%),
-        linear-gradient(90deg, transparent 95%, rgba(0, 243, 255, 0.1) 95%);
-    background-size: 40px 40px;
-    z-index: -1;
-    pointer-events: none;
+/* Скрываем ретро-эффект сканлайна */
+.scanline {
+    display: none;
 }
 
+/* --- Заголовок и Логотип --- */
 h1 {
-    font-family: var(--font-primary);
-    color: var(--neon-cyan);
-    text-shadow: 0 0 10px var(--neon-cyan);
-    margin-bottom: 30px;
-    letter-spacing: 2px;
+    width: 100%;
+    text-align: center;
+    margin-bottom: 2rem;
+    z-index: 2; /* Поверх фона */
 }
 
-/* Layout Container */
+.main-logo {
+    max-width: 250px; /* Оптимальный размер логотипа */
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+/* --- Основной контейнер --- */
 .main-terminal {
     display: flex;
-    flex-direction: row;
-    gap: 40px;
+    gap: 40px; /* Больше воздуха между колонками */
     width: 90%;
-    max-width: 1400px;
-    height: 80vh;
+    max-width: 1200px;
+    height: 70vh;
+    z-index: 2;
+    background: rgba(17, 17, 17, 0.85); /* Полупрозрачный черный фон для читаемости */
+    backdrop-filter: blur(10px); /* Эффект матового стекла (Premium feel) */
+    border: 1px solid #333; /* Тонкий дивайдер */
+    padding: 40px;
 }
 
-/* Avatar Section */
+/* --- Левая секция: Аватар и кнопки --- */
 .avatar-section {
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    position: relative;
-    padding-top: 50px;
+    gap: 20px;
 }
 
+/* Рамка аватара */
 .avatar-frame {
-    width: 100%;
-    max-width: 500px;
-    aspect-ratio: 16/9; /* Adjust for video aspect */
-    border: 2px solid var(--neon-cyan);
-    box-shadow: 0 0 20px var(--neon-cyan);
-    border-radius: 10px;
-    overflow: hidden;
-    position: relative;
-    transition: border-color 0.3s, box-shadow 0.3s;
+    flex-grow: 1;
     background: #000;
+    border: 1px solid #333; /* Тонкая рамка вместо "трубы" */
+    position: relative;
+    overflow: hidden;
+    /* Убрали скругления для строгости, либо делаем минимальные */
+    border-radius: 4px; 
 }
 
-.avatar-frame.speaking {
-    border-color: var(--neon-pink);
-    box-shadow: 0 0 30px var(--neon-pink);
-}
-
-video {
+#simli-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-/* Controls */
+/* --- Панель управления --- */
 .controls {
-    margin-top: 40px;
     display: flex;
-    gap: 20px;
     flex-direction: column;
-    align-items: center;
-    width: 100%;
+    gap: 15px;
+}
+
+#status {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #666; /* Neutral Grey */
+    text-align: center;
+    font-weight: 600;
 }
 
 .controls-row {
     display: flex;
-    gap: 20px;
+    gap: 15px;
+    justify-content: center;
 }
 
+/* --- Кнопки (Акцентный стиль) --- */
 button {
-    background: transparent;
-    border: 2px solid var(--neon-cyan);
-    color: var(--neon-cyan);
-    font-family: var(--font-primary);
-    padding: 10px 20px;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: all 0.2s;
+    background-color: #FDC300; /* Accent Yellow */
+    color: #111111; /* Темный текст для контраста */
+    border: none;
+    padding: 14px 28px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
     text-transform: uppercase;
-    box-shadow: 0 0 5px var(--neon-cyan);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 2px; /* Минимальное скругление */
+    min-width: 140px;
 }
 
-button:hover:not(:disabled) {
-    background: var(--neon-cyan);
-    color: var(--bg-color);
-    box-shadow: 0 0 15px var(--neon-cyan);
+button:hover {
+    background-color: #e0ac00; /* Чуть темнее при наведении */
+    transform: translateY(-2px); /* Легкий подъем */
 }
 
 button:disabled {
-    border-color: #555;
-    color: #555;
-    box-shadow: none;
+    background-color: #333;
+    color: #666;
     cursor: not-allowed;
+    transform: none;
 }
 
-#status {
-    margin-top: 10px;
-    font-family: var(--font-primary);
-    color: var(--acid-green);
-    text-shadow: 0 0 5px var(--acid-green);
-    min-height: 20px;
+/* Визуализатор аудио */
+#audio-visualizer {
+    width: 100%;
+    height: 40px;
+    background: #000;
+    border-top: 2px solid #FDC300; /* Золотая линия сверху */
+    opacity: 0.8;
 }
 
-/* Logs Section */
+/* --- Правая секция: Логи --- */
 .logs-section {
     flex: 1;
-    background: var(--terminal-bg);
-    border: 1px solid var(--neon-cyan);
-    box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
-    border-radius: 5px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    position: relative;
-    max-width: 600px;
+    border-left: 1px solid #333; /* Вертикальный разделитель */
+    padding-left: 40px;
+    font-family: 'Montserrat', sans-serif; /* Можно оставить monospace, но sans-serif премиальнее */
 }
 
 .logs-header {
-    background: rgba(0, 243, 255, 0.1);
-    padding: 10px;
-    border-bottom: 1px solid var(--neon-cyan);
-    font-family: var(--font-primary);
-    color: var(--neon-cyan);
-    font-size: 0.9rem;
     display: flex;
     justify-content: space-between;
+    border-bottom: 2px solid #FDC300; /* Золотой акцент */
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #FFF;
 }
 
 .logs-content {
-    flex: 1;
-    padding: 15px;
+    flex-grow: 1;
     overflow-y: auto;
-    font-size: 0.9rem;
-    line-height: 1.4;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #DDD; /* Чуть приглушенный белый */
 }
 
-/* Scrollbar */
+/* Стилизация скроллбара для логов */
 .logs-content::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 .logs-content::-webkit-scrollbar-track {
     background: #111;
 }
 .logs-content::-webkit-scrollbar-thumb {
-    background: var(--neon-cyan);
-    border-radius: 4px;
+    background: #333;
+}
+.logs-content::-webkit-scrollbar-thumb:hover {
+    background: #FDC300;
 }
 
-.log-entry {
-    margin-bottom: 10px;
-    word-wrap: break-word;
-    animation: fadeIn 0.3s ease;
-    border-bottom: 1px solid rgba(0, 243, 255, 0.1);
-    padding-bottom: 5px;
-}
-
-.role-user {
-    color: #ffffff;
-}
-.role-user .role-label {
-    color: var(--acid-green);
-    font-weight: bold;
-}
-
-.role-ai {
-    color: var(--neon-cyan);
-    text-shadow: 0 0 2px var(--neon-cyan);
-}
-.role-ai .role-label {
-    color: var(--neon-pink);
-    font-weight: bold;
-}
-
-.timestamp {
-    color: #666;
-    font-size: 0.8rem;
-    margin-right: 10px;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Scanline Effect */
-.scanline {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-        to bottom,
-        transparent 50%,
-        rgba(0, 0, 0, 0.3) 50%
-    );
-    background-size: 100% 4px;
-    pointer-events: none;
-    z-index: 10;
-    opacity: 0.3;
-}
-
-/* Visualizer (Optional placeholder) */
-#audio-visualizer {
-    width: 100%;
-    height: 50px;
-    background: #111;
-    margin-top: 20px;
-    border: 1px solid #333;
+/* Адаптив для мобильных устройств */
+@media (max-width: 768px) {
+    .main-terminal {
+        flex-direction: column;
+        height: auto;
+        padding: 20px;
+    }
+    
+    .logs-section {
+        border-left: none;
+        border-top: 1px solid #333;
+        padding-left: 0;
+        padding-top: 20px;
+        height: 200px; /* Фиксированная высота для логов на мобильном */
+    }
+    
+    body {
+        background-size: 150%; /* Увеличим бабочку на фоне */
+    }
 }
