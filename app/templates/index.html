@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CFO AI Neural Interface</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -23,7 +23,7 @@
         <div class="terminal-body">
             <div class="avatar-section">
                 <div class="avatar-frame" id="avatarFrame">
-                    <video id="simli-video" poster="/static/avatar.png" autoplay playsinline></video>
+                    <video id="simli-video" poster="/static/avatar.png" autoplay playsinline muted loop></video>
                     <audio id="simli-audio" autoplay></audio>
                     <div class="live-badge">LIVE FEED ●</div>
                 </div>
@@ -41,6 +41,9 @@
             <div class="logs-section">
                 <div class="logs-header">
                     <span class="tech-text">TRANSCRIPT PROTOCOL</span>
+                    
+                    <img src="data:image/webp;base64,UklGRsYKAABXRUJQVlA4WAoAAAAQAAAAvwEAHAAAQUxQSHoEAAAB8FZre95m27atEMSgGwRDEAQzODcGuxlEDGIGCoOcDHQyMIQNgiAsP+LklOoeH/0XEROgv+8pmuRkKUK/sikOacN/b5T0Pv3C5FVrP0w1blqOWJTz78oNdEDNwFeD/+rg9qsSFDXwBJEK7Cr0XxXLUnrcpaUv0l4lLfmfWq21Lm9qrTUPy/X9Nmqtn64TvNZafcpSa63pzGqtdUzKku4upTDpVqSUbdheT+8+pZ7f84xbrTVLSrXWOic/A/pznWT3gOOPTfBa6zrB7gFHNUkA7ewPgA9z3rdRhU/LhADoUzJAOXsC/H9WzDpNd3ALIm2wKYhkJQ0J3sYygfdPG9cAl2QAM6zxttmM/3Aey7gHUMYtndO+nrG9WPwVLJzmad1enDGF4kB06AFEBwLID3wOffkGHFez4MOwccb7bpew4P1y1pOkyl/BfrZPo0lKMciKpWDXRs8paNpg1UHIik2ifQfKtVLwcaRh+0t0gP0SG0DvL/WMu7TwDZqdjrKc8wP4X87ZxsVZn0eWbgw6NUnFJYUkd0mm4S/ZrAB8TfGcD6Bd6wbQspQbQBnWgCIVuusSD6BKG33TG7LiW2h6AapmLkAEkOdFMmb8qYvseCZ5X2XPp2mtPuVLUgB5ypeUgX6tAJ46fQB92BO4S/KkS2lN+qA536HXV7vSDtQd2OdRnsO8+wrdD6gO+BOeDixbz1P6T3C01o4pGcDOUgeWUQUg7otmztkA4p71+ob+Lc7zlQJYM9AndT4ewAvlgLYD5YC2A3ljHbbm9Q50TfnjHkCb8uEwB5reHoCPSp3T8Iuk4DRub3ZOo/14C4DUgTyntbMyRibtzWVxmAqb7DhMpW2SadjbMuet/xxthixOIOwSsjiBsJOv48R+vg1o0gPYJ9lJaND74pJCkrumfvLQd3jqcse7A1iHSX6c0K4heTuhneWXXfOavaYLHS+lPIGYpPKyDkqeUuOmtceixl1rj0WVp2xNc5q+w645m5nlKQaQzwzAxqUk8wBI10hJ5gfA14keEPYdNH2W8XGelAKqBhXKCkSHHkB06AEsO9uwvALYpL2ULWmSS7IpakDYiwUQGv6n3yWlDnxdwvtdkgLIZ6nj+gZRXrfrbJ+VSVrpNsqqZQgV8NSJVKCkoNtSbdiXHkCb9KXJ38QBenW/dwAfZQHUnG9cxBpQc974RNuh73Ae1zk+i1lqRaNezZP0KJJ1k/a7ZG4afWYdyD+fHny8a3TqfBi6QOp8GHqj9BdgAFmSDCDPSpqyrJLqu9tdUl4mqQDtLyA9P3lo/PaJX0H+Sfng9afbgNBpAGXW6biDm+7g1ol0g003+qzUAf/5pBJnfdNMj7PuuoTWOOub5O6e3mR3t2Hm79cZi7vncdnd17Ps7uuo5O7rO3f3MRukgLoAX09o6pRhq7snSdnd8zB39zQru7tJSu7uU6R1r3X3pMnrXuvuSeOzuy/jpHWvtW5Jf98ta6NbOnhojb7Ksn5zk35nnzdpeS7Sn/vvjHFIOy51fme0mJRWSZb/0QFWUDggJgYAABAjAJ0BKsABHQA+USKNRSOiIRLqbyA4BQS2AzgzQLwB+gH8AhAH8A/AD9AP4BsdCeg1D+YfkV2MWjOpfij+1X/L6oDUfuD+1v+0y5rw/80/xf9A/Xr/hf/////J3/AfgB8gPz57AH6U/5b+gfi58R3qA/lHoA/mf8t/4f/I/f/5eP5N/hP5n7gPQA/n38b/fL3Nf6F7AHoAfwv/Aeqx/mP+h/t/3/+hj9s/2Z/9fyN/zr+s/+z8//kA9AD/y+oB6/AJejFFJYF1A5CpULxPNqMxsm738ukaohUr1WBItOhmrRlPEgtLZoCmvdwll3MbZqjtVoUPx36V8/cEr/00uxTgsYxvOeTU/V86Sm14zvYsHKkFU/dfkYRYVji1aEOzkAAA/vDxQnKVREQ7L5ihmnX05u1qWXLE4i56/0z/9Zl8a3arXdhq85284pYWBEz07VpEm91+vUA89NSj1KO2ee1KmJCEh2KOHhEu69n06JY5FzWbFbk36hURoFXFDoJ5f7YM+FD0uWaFHmziN0G3q84Dkefnzu69nUBMwzM2Jm817ddaCppUvSYEPemEb5kH6qhL86CfHgHnjaDEvDkXvACmFrNGCVxyYFIkEjz0RWfseVLex/4UNfizW4xzgt0mOdYse0ucl/VOOdFxMXoK3kvX0/Ivjm28Mu2pCiVvvkBFhrThQowm0S/duijQf7gKH3QzZdckGssWoun6Md5fN8MXC0prbMuOcT+DS46BJnSo/c6NyZCoFOVIlEBt3upqn7cazrfcYXq6xFKADxInLxNiDOdALhEutiJB2D/YQR1yF4DX4RmKKsbE4x36jYnHGBfgrCQJ4E+518uOh75hR9RyH24DHyRl6gKTtkL1S8Oiff9ULgA2MgMx+iTdVT/7Kz2AZ+jVmhpy5nP1wd0kEU3+1QTghR2ekyH1Kk56+3aQLzoEBH9HbogpGFDSKSJBODADLT4Y8izXAYmJ1SLJnBRQS3yn+mDTldHNhkICsufUQ/kQ01oVe4twfdqy1aO9Q5EZ4dZ65///9pC//+0KLHM2Tzfb6L1tChNQCiy16RLIt1hbGe4LE4zzBe2Z7BN7dgKSvDxOFJAiCfJnYe1BrBxTL9JRkK09rV3WAosNacKFFkaUtE8+///8tG0bRDpxP1Hw5NJPmE/2kVlIzcWVfl4IDzdofJutPbeNMI8kshWlAl0HHU1KGAUCUwDim4r4odf4DyfH8CZ28Q/L0WmBuoZWRAUXbB2Z7O7oCwKGCT1t57tMDe8ZvmTgkeHW5oemQM0qdfMUqfCY9sZmxXHmijYxIVhWKMNh32vQbNRQG72Gy+72yK8cQ6aUpo0X43z16XOnjtgupsErJ8T9Th8JVX/3YVNesAoq6zjivWjptiAo0njOMxolL31LIj0hKAatIuVx+wSujn/NZAnsV0WJhGzij///T7h10KWKOyOggvg5o3c52S42wv7NyaFM7kcu7dxbAR/6DSc8QD65L6Knk4OLQ29zRuTgECBK8Hy9o/gbhSwRB4OZ/s1kTKyG5YZyDAQqMA567RcLiOG/uHHNoam6IDMWtlzeRkcr+8Bj34CdBOsAGGCKC9y6SEOF7OlF5gc1E26YM5GzYFmX8HNG22LS5/vt2Nrm9FJSCjfEaJsxomgwirayZrFf24G1xpDveMASD56XTjQEGXyaKgCLqQJMXuEZpLu1eOY+K1lcCXhbpEIiASXVdsXQvGRyeEAngcyfnc5wgtSZEWffC9QzOpxpFUOrtPExw92sKBYu+OQEX2cKqyTJ+dKOAUdPzF18/xbOe06qS4wsHOCx/IilCu/kku9WQMlvMlJtgO3gPlW8/0CfWNfKrq9+BNQS2XfFyHNnZL6z8d8A1bjoAKodipdoTLqG0vv82nU7z6jkCVeBc6tH3fR0iob1REOsW7nZJb6bqJj+2uN/GIsZ+e0NrAPTk+xnZXNz6qz96Zdp0jOfbGipk1ZpSdK8NjeFTgsnAFI/9sOOtrIatcUaZLNuFurE5ZEp2qzZvhGKpXhpNf7ba6CWRdIdLq6dPpzqljnEsro+24NyyAZ2qjY0vLzF3QpYm0bAqPwVINmJpO0vvv5UOHj4OAAA" class="header-icon" alt="System Icon">
+
                     <span class="status-active">ACTIVE AWAITING DATA...</span>
                 </div>
                 <div id="logs" class="logs-content">
