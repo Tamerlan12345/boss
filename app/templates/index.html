@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CFO - DOS AI Assistant</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>CFO AI Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -22,19 +22,21 @@
             </div>
 
             <div class="controls">
-                <div id="status">DISCONNECTED</div>
+                <div id="status">SYSTEM OFFLINE</div>
+                
                 <div class="controls-row">
-                    <button id="connectBtn">CONNECT SYSTEM</button>
-                    <button id="disconnectBtn" disabled>DISCONNECT</button>
+                    <button id="connectBtn">START SESSION</button>
+                    <button id="disconnectBtn" disabled>END SESSION</button>
                 </div>
+                
                 <canvas id="audio-visualizer" width="500" height="60"></canvas>
             </div>
         </div>
 
         <div class="logs-section">
             <div class="logs-header">
-                <span>SYSTEM_LOG://LIVE_STREAM</span>
-                <span>STATUS: ACTIVE</span>
+                <span>TRANSCRIPT STREAM</span>
+                <span>LIVE</span>
             </div>
             <div id="logs" class="logs-content">
                 </div>
