@@ -1,14 +1,13 @@
-/* --- 1. Глобальные настройки --- */
 :root {
-    /* Палитра CFO Summit */
-    --bg-dark: #050505;       /* Очень глубокий черный */
+    --bg-dark: #030303;
+    --neon-gold: #FFD700;       /* Яркий чистый золотой */
+    --gold-dim: #998100;        /* Темное золото для границ */
     --text-white: #FFFFFF;
-    --text-grey: #8E8E93;     /* Apple-style grey для второстепенного текста */
-    --border-light: rgba(255, 255, 255, 0.12); /* Очень тонкие разделители */
+    --glass-bg: rgba(10, 10, 10, 0.75);
     
-    /* Золотой градиент (как на наградах и кнопках CFO) */
-    --gold-gradient: linear-gradient(135deg, #CF9D4E 0%, #F5D061 50%, #CF9D4E 100%);
-    --gold-glow: 0 4px 20px rgba(207, 157, 78, 0.3);
+    /* Эффект свечения (Neon Glow) */
+    --glow-gold: 0 0 10px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.1);
+    --border-tech: 1px solid rgba(255, 215, 0, 0.3);
 }
 
 * {
@@ -22,81 +21,133 @@ body {
     color: var(--text-white);
     font-family: 'Montserrat', sans-serif;
     height: 100vh;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
-
-    /* Фоновая бабочка (Watermark) */
-    background-image: url('https://cfo.kgforum.kz/assets/about-butterfly-BvsDo2Y0.webp');
-    background-repeat: no-repeat;
-    background-position: center bottom -50px; /* Чуть ниже, чтобы не мешать контенту */
-    background-size: 60%; /* Не слишком огромная */
-    background-blend-mode: luminosity; /* Делает её более строгой/монохромной */
+    position: relative;
 }
 
-/* Скрываем ретро-линии */
-.scanline { display: none; }
+/* --- Фоны (Cyberpunk Layers) --- */
 
-/* --- 2. Логотип --- */
-h1 {
-    width: 100%;
-    text-align: center;
-    margin-bottom: 30px;
+/* 1. Логотип Бабочки (Сделали ярче и больше) */
+.bg-watermark {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background-image: url('https://cfo.kgforum.kz/assets/about-butterfly-BvsDo2Y0.webp');
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: 70%; /* Крупно */
+    opacity: 0.25; /* Более заметно чем раньше */
+    filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.2)); /* Легкое золотое свечение сзади */
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* 2. Кибер-сетка на фоне */
+.cyber-grid {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background-image: 
+        linear-gradient(rgba(255, 215, 0, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 215, 0, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px; /* Размер ячейки */
+    z-index: 1;
+    pointer-events: none;
+    mask-image: radial-gradient(circle, black 40%, transparent 100%); /* Исчезает к краям */
+}
+
+/* --- Логотип Сверху --- */
+.logo-container {
     z-index: 10;
+    margin-bottom: 2rem;
+    position: relative;
 }
 
 .main-logo {
-    max-width: 220px;
+    max-width: 240px;
     height: auto;
-    filter: drop-shadow(0 0 10px rgba(0,0,0,0.5)); /* Тень, чтобы читался на любом фоне */
+    filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.3)); /* Неоновая тень логотипа */
 }
 
-/* --- 3. Основной контейнер (Стекло) --- */
+/* --- Основной Терминал --- */
 .main-terminal {
-    display: flex;
-    gap: 40px;
+    position: relative;
     width: 90%;
-    max-width: 1100px;
-    height: 65vh;
-    z-index: 2;
-    
-    /* Эффект дорогого стекла */
-    background: rgba(20, 20, 20, 0.6);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--border-light);
-    border-radius: 16px; /* Современные скругления */
-    padding: 40px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    max-width: 1200px;
+    height: 70vh;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px); /* Сильное размытие фона */
+    border: 1px solid rgba(255, 215, 0, 0.2); /* Тонкая золотая рамка */
+    box-shadow: 0 0 50px rgba(0,0,0,0.8);
+    z-index: 10;
+    padding: 2px; /* Отступ для декоративных уголков */
 }
 
-/* --- 4. Левая секция (Аватар) --- */
+/* Декоративные уголки (Cyberpunk Corners) */
+.corner {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--neon-gold);
+    box-shadow: 0 0 8px var(--neon-gold);
+    z-index: 20;
+}
+.corner-tl { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+.corner-tr { top: -1px; right: -1px; border-left: none; border-bottom: none; }
+.corner-bl { bottom: -1px; left: -1px; border-right: none; border-top: none; }
+.corner-br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+.terminal-body {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    padding: 40px;
+    gap: 40px;
+}
+
+/* --- Левая часть: Аватар --- */
 .avatar-section {
-    flex: 0 0 400px; /* Фиксированная ширина для левой колонки */
+    flex: 0 0 450px;
     display: flex;
     flex-direction: column;
-    gap: 25px;
+    gap: 20px;
 }
 
 .avatar-frame {
     flex-grow: 1;
-    background: #000;
-    border-radius: 12px;
-    border: 1px solid var(--border-light);
-    overflow: hidden;
     position: relative;
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+    background: #000;
+    /* Яркая обводка стрима, как просил */
+    border: 2px solid var(--neon-gold); 
+    box-shadow: var(--glow-gold), inset 0 0 20px rgba(0,0,0,0.8);
+    overflow: hidden;
 }
 
 #simli-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0.9; /* Чуть приглушаем видео, чтобы не было пересвета */
+    opacity: 0.9;
 }
 
-/* --- 5. Контроллеры --- */
+/* Бейдж LIVE на видео */
+.live-badge {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: rgba(0,0,0,0.7);
+    color: var(--neon-gold);
+    padding: 5px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    border: 1px solid var(--neon-gold);
+    letter-spacing: 1px;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+}
+
+/* --- Контроллеры --- */
 .controls {
     display: flex;
     flex-direction: column;
@@ -104,12 +155,12 @@ h1 {
 }
 
 #status {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    color: var(--text-grey);
+    font-family: 'Courier New', monospace; /* Tech font */
+    color: var(--neon-gold);
     text-align: center;
-    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
 }
 
 .controls-row {
@@ -117,131 +168,111 @@ h1 {
     gap: 15px;
 }
 
-/* --- 6. КНОПКИ (Самое важное изменение) --- */
 button {
     flex: 1;
-    padding: 16px;
-    border: none;
+    padding: 18px;
     font-family: 'Montserrat', sans-serif;
     font-weight: 700;
-    font-size: 13px;
     text-transform: uppercase;
+    font-size: 12px;
     letter-spacing: 1px;
     cursor: pointer;
-    border-radius: 8px;
-    transition: all 0.3s ease;
+    border: none;
+    transition: all 0.2s ease;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); /* Скошенные углы (Cyberpunk style) */
 }
 
-/* Кнопка START: Золотой градиент */
+/* Кнопка Connect - Неоновая заливка */
 #connectBtn {
-    background: var(--gold-gradient);
-    background-size: 200% auto; /* Для анимации градиента */
-    color: #111; /* Темный текст на золоте */
-    box-shadow: var(--gold-glow);
+    background: var(--neon-gold);
+    color: #000;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
 }
-
 #connectBtn:hover {
-    background-position: right center; /* Перелив градиента при наведении */
-    transform: translateY(-2px);
+    background: #FFF;
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
 }
 
-/* Кнопка STOP: Прозрачная с обводкой */
+/* Кнопка Disconnect - Контурная */
 #disconnectBtn {
     background: transparent;
-    color: var(--text-white);
-    border: 1px solid rgba(255,255,255,0.3);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #FFF;
 }
-
 #disconnectBtn:hover:not(:disabled) {
-    border-color: #FFF;
-    background: rgba(255,255,255,0.05);
+    border-color: var(--neon-gold);
+    color: var(--neon-gold);
+    box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.2);
 }
-
 #disconnectBtn:disabled {
     opacity: 0.3;
+    border-color: #333;
     cursor: not-allowed;
 }
 
-/* Визуализатор аудио */
-#audio-visualizer {
-    width: 100%;
-    height: 30px;
-    /* Убрали фон, оставили только волну */
-    background: transparent;
-    border-bottom: 1px solid var(--border-light);
-}
-
-/* --- 7. Правая секция (Логи/Транскрипт) --- */
+/* --- Правая часть: Логи --- */
 .logs-section {
     flex: 1;
     display: flex;
     flex-direction: column;
-    /* Убрали боковую рамку, сделали просто отступ */
-    padding-left: 20px; 
+    border-left: 1px solid rgba(255, 215, 0, 0.15); /* Еле заметная золотая линия */
+    padding-left: 30px;
+    position: relative;
 }
 
 .logs-header {
     display: flex;
     justify-content: space-between;
     padding-bottom: 15px;
-    margin-bottom: 15px;
-    border-bottom: 1px solid var(--border-light); /* Тонкая белая линия */
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.3);
     font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 1.5px;
-    color: var(--text-grey);
-    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #888;
 }
 
-/* Маркер "LIVE" */
-.logs-header span:last-child {
-    color: #F5D061; /* Золотой цвет текста */
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.logs-header span:last-child::before {
-    content: '';
-    display: block;
-    width: 6px;
-    height: 6px;
-    background: #F5D061;
-    border-radius: 50%;
-    box-shadow: 0 0 8px #F5D061;
+.status-active {
+    color: var(--neon-gold);
+    text-shadow: 0 0 5px var(--neon-gold);
+    animation: pulse 2s infinite;
 }
 
 .logs-content {
     flex-grow: 1;
     overflow-y: auto;
-    font-size: 15px;
-    line-height: 1.7;
-    color: #E0E0E0;
-    font-weight: 300; /* Более тонкий шрифт, выглядит дороже */
+    font-family: 'Courier New', monospace; /* Техно шрифт для логов */
+    font-size: 14px;
+    line-height: 1.6;
+    color: #EEE;
+    text-shadow: 0 0 2px rgba(0,0,0,0.5);
 }
 
-/* Скроллбар (тонкий и незаметный) */
-.logs-content::-webkit-scrollbar { width: 4px; }
-.logs-content::-webkit-scrollbar-track { background: transparent; }
-.logs-content::-webkit-scrollbar-thumb { background: #333; border-radius: 2px;}
+/* Скроллбар в стиле Tech */
+.logs-content::-webkit-scrollbar { width: 6px; }
+.logs-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+.logs-content::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 0; }
+.logs-content::-webkit-scrollbar-thumb:hover { background: var(--neon-gold); }
 
-/* Мобильная версия */
-@media (max-width: 768px) {
-    .main-terminal {
-        flex-direction: column;
-        height: auto;
-        padding: 20px;
-        gap: 20px;
-    }
-    
-    .avatar-section {
-        flex: none;
-        width: 100%;
-    }
-    
-    .logs-section {
-        padding-left: 0;
-        height: 250px;
-        border-top: 1px solid var(--border-light);
-        padding-top: 20px;
-    }
+/* Визуализатор аудио - Неоновая линия */
+#audio-visualizer {
+    width: 100%;
+    background: transparent;
+    border-top: 1px solid rgba(255, 215, 0, 0.2);
+    margin-top: 10px;
+}
+
+/* --- Анимации --- */
+@keyframes pulse {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; text-shadow: 0 0 15px var(--neon-gold); }
+    100% { opacity: 0.7; }
+}
+
+/* --- Адаптив --- */
+@media (max-width: 900px) {
+    .main-terminal { height: auto; flex-direction: column; }
+    .terminal-body { flex-direction: column; padding: 20px; }
+    .avatar-section { flex: none; width: 100%; height: 300px; }
+    .logs-section { border-left: none; border-top: 1px solid rgba(255,215,0,0.2); padding-left: 0; padding-top: 20px; height: 300px;}
+    .bg-watermark { background-size: 100%; opacity: 0.15; }
 }
