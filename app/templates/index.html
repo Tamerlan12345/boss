@@ -4,13 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CFO AI Neural Interface</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="bg-watermark"></div>
-    
-    <div class="cyber-grid"></div>
 
     <div class="logo-container">
         <img src="https://cfo.kgforum.kz/assets/about-cfo-logo-xOmTy2lM.webp" alt="CFO Summit Logo" class="main-logo">
@@ -25,17 +23,16 @@
         <div class="terminal-body">
             <div class="avatar-section">
                 <div class="avatar-frame" id="avatarFrame">
-                    <div class="video-scanline"></div>
                     <video id="simli-video" poster="/static/avatar.png" autoplay playsinline></video>
                     <audio id="simli-audio" autoplay></audio>
-                    <div class="live-badge">● LIVE FEED</div>
+                    <div class="live-badge">LIVE FEED ●</div>
                 </div>
 
                 <div class="controls">
-                    <div id="status">SYSTEM STANDBY</div>
+                    <div id="status">SYSTEM READY</div>
                     <div class="controls-row">
-                        <button id="connectBtn" class="glitch-btn">INITIALIZE</button>
-                        <button id="disconnectBtn" disabled>TERMINATE</button>
+                        <button id="connectBtn" class="primary-btn">INITIALIZE SESSION</button>
+                        <button id="disconnectBtn" class="secondary-btn" disabled>TERMINATE</button>
                     </div>
                     <canvas id="audio-visualizer" width="500" height="40"></canvas>
                 </div>
@@ -43,8 +40,8 @@
 
             <div class="logs-section">
                 <div class="logs-header">
-                    <span class="tech-text">NEURAL_LOG // STREAM_01</span>
-                    <span class="status-active">ONLINE</span>
+                    <span class="tech-text">TRANSCRIPT PROTOCOL</span>
+                    <span class="status-active">ACTIVE AWAITING DATA...</span>
                 </div>
                 <div id="logs" class="logs-content">
                     </div>
