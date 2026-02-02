@@ -3,16 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dos AI Assistant - Neural Terminal</title>
+    <title>CFO AI Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="scanline"></div>
 
-    <h1>DOS :: NEURAL INTERFACE</h1>
+    <h1>
+        <img src="https://cfo.kgforum.kz/assets/about-cfo-logo-xOmTy2lM.webp" alt="CFO Summit Logo" class="main-logo">
+    </h1>
 
     <div class="main-terminal">
-        <!-- Left: Avatar & Controls -->
         <div class="avatar-section">
             <div class="avatar-frame" id="avatarFrame">
                 <video id="simli-video" poster="/static/avatar.png" autoplay playsinline></video>
@@ -22,23 +24,20 @@
             <div class="controls">
                 <div id="status">DISCONNECTED</div>
                 <div class="controls-row">
-                    <button id="connectBtn">Connect System</button>
-                    <button id="disconnectBtn" disabled>Disconnect</button>
+                    <button id="connectBtn">CONNECT SYSTEM</button>
+                    <button id="disconnectBtn" disabled>DISCONNECT</button>
                 </div>
-                <!-- Visualizer placeholder -->
                 <canvas id="audio-visualizer" width="500" height="60"></canvas>
             </div>
         </div>
 
-        <!-- Right: Logs -->
         <div class="logs-section">
             <div class="logs-header">
-                <span>NEURAL_LOG://STREAM_01</span>
+                <span>SYSTEM_LOG://LIVE_STREAM</span>
                 <span>STATUS: ACTIVE</span>
             </div>
             <div id="logs" class="logs-content">
-                <!-- Log entries will appear here -->
-            </div>
+                </div>
         </div>
     </div>
 
