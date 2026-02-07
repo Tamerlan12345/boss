@@ -51,6 +51,14 @@ async def startup_event():
 async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+@app.get("/panel")
+async def get_panel(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/speaker")
+async def get_speaker(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
 @app.get("/simli/config")
 def get_simli_config():
     return {
@@ -72,7 +80,7 @@ def resample_audio_sync(audio_bytes: bytes) -> bytes:
         return audio_bytes
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
     await websocket.accept()
 
     gemini_client = GeminiClient()
@@ -80,23 +88,46 @@ async def websocket_endpoint(websocket: WebSocket):
     current_speaker = None
     loop = asyncio.get_running_loop()
 
+    # State for Panel Mode
+    state = {"speaking_enabled": True}
+
     try:
-        system_instruction = (
+        # Determine System Instruction based on Mode
+        base_instruction = (
             "You are Dos, an expert AI assistant and passive analyst. "
             "ROLE: Deep Dive Expert. Engage in deep analytical discussion. "
             "MODE: AUDIO-ONLY. "
             "CRITICAL RULE: NEVER output text thoughts, internal monologue, or explanations in the audio stream. "
-            "ACTIVATION: You are listening to a conversation. "
-            "IF the user's input explicitly starts with or contains the name 'Dos' (or 'Дос'): "
-            "  - Generate a comprehensive, structured, and expert-level audio response in Russian. "
-            "  - Use the full context of the conversation. "
-            "IF the name 'Dos' is NOT heard: "
-            "  - Output EXACTLY the text token: [SILENCE] "
-            "  - Do NOT generate any audio. "
             "IDENTITY: 'Я ИИ спикер Dos'. "
             "LANGUAGE: Russian. "
             "Speak clearly, with a moderate pace, articulating words distinctively to ensure good lip-sync."
         )
+
+        if mode == "speaker":
+            system_instruction = (
+                f"{base_instruction} "
+                "PHASE 1 (LISTENING): Introduce yourself briefly as an analyst, then listen silently. "
+                "Output [SILENCE] if you are just listening. "
+                "Do not speak unless you receive a specific trigger to summarize."
+            )
+        elif mode == "panel":
+            system_instruction = (
+                f"{base_instruction} "
+                "You are a participant in a panel discussion. "
+                "Listen to the context. If you are asked to speak, respond naturally. "
+                "If the user input does not require a response or you are just listening, output [SILENCE]."
+            )
+        else: # Default
+            system_instruction = (
+                f"{base_instruction} "
+                "ACTIVATION: You are listening to a conversation. "
+                "IF the user's input explicitly starts with or contains the name 'Dos' (or 'Дос'): "
+                "  - Generate a comprehensive, structured, and expert-level audio response in Russian. "
+                "  - Use the full context of the conversation. "
+                "IF the name 'Dos' is NOT heard: "
+                "  - Output EXACTLY the text token: [SILENCE] "
+                "  - Do NOT generate any audio. "
+            )
         
         await gemini_client.connect(system_instruction=system_instruction)
 
@@ -127,8 +158,24 @@ async def websocket_endpoint(websocket: WebSocket):
                             await gemini_client.send_audio(data)
                         
                         elif "text" in message:
-                            # Игнорируем текстовые сообщения от клиента, чтобы не крашить сокет
-                            pass
+                            # Обработка JSON команд от клиента
+                            try:
+                                msg_data = json.loads(message["text"])
+                                if msg_data.get("type") == "mute_toggle":
+                                    state["speaking_enabled"] = msg_data.get("enabled", True)
+                                    logger.info(f"Mute toggle: speaking_enabled={state['speaking_enabled']}")
+
+                                elif msg_data.get("type") == "trigger_summary":
+                                    logger.info("Triggering summary generation...")
+                                    prompt = (
+                                        "Проанализируй всё услышанное обсуждение. "
+                                        "Сделай структурированную выжимку (summary) длительностью от 80 до 180 секунд (2-3 минуты). "
+                                        "Выдели ключевые тезисы, аргументы и выводы. "
+                                        "После этого ответа переходи в режим ожидания: отвечай только если услышишь обращение 'Dos' или 'Дос'."
+                                    )
+                                    await gemini_client.send_text(prompt)
+                            except json.JSONDecodeError:
+                                pass
 
             except WebSocketDisconnect:
                 logger.info("Client disconnected (Exception)")
@@ -146,16 +193,29 @@ async def websocket_endpoint(websocket: WebSocket):
             logger.info("Pausing for Simli stabilization...")
             await asyncio.sleep(1.5)
 
-            # Приветствие
-            await gemini_client.send_text(
-                'Generate audio immediately. Say exactly this phrase with energy: '
-                '"Я ИИ спикер Dos. Сегодня я буду вместе с вами разбирать и участвовать в теме обсуждения, которую вы зададите."'
-            )
+            # Приветствие (зависит от режима)
+            if mode == "speaker":
+                 await gemini_client.send_text(
+                    'Generate audio immediately. Introduce yourself briefly as "Dos Speaker", an analyst here to listen and summarize later.'
+                )
+            elif mode == "panel":
+                 await gemini_client.send_text(
+                    'Generate audio immediately. Say: "Я ИИ спикер Dos. Я готов участвовать в дискуссии."'
+                )
+            else:
+                await gemini_client.send_text(
+                    'Generate audio immediately. Say exactly this phrase with energy: '
+                    '"Я ИИ спикер Dos. Сегодня я буду вместе с вами разбирать и участвовать в теме обсуждения, которую вы зададите."'
+                )
 
             try:
                 # Стандартный цикл чтения (без прерываний)
                 async for chunk in gemini_client.receive():
                     if isinstance(chunk, bytes):
+                        # Filter out audio if muted in Panel mode
+                        if mode == "panel" and not state["speaking_enabled"]:
+                            continue
+
                         if is_silenced: continue
                         resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
                         if resampled_audio:
@@ -177,7 +237,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 # Отправляем остатки аудио
                 if len(audio_buffer) > 0 and not is_silenced:
-                    await websocket.send_bytes(bytes(audio_buffer))
+                    # Check mute again for remaining buffer
+                    if not (mode == "panel" and not state["speaking_enabled"]):
+                        await websocket.send_bytes(bytes(audio_buffer))
 
             except Exception as e:
                 logger.error(f"Error sending to client: {e}")
