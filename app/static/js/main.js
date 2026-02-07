@@ -10,9 +10,39 @@ let dataArray;
 
 const connectBtn = document.getElementById('connectBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
+const muteBtn = document.getElementById('muteBtn');
+const summaryBtn = document.getElementById('summaryBtn');
 const statusDiv = document.getElementById('status');
 const logsDiv = document.getElementById('logs');
 const videoElement = document.getElementById('simli-video');
+
+// Detect Mode
+const path = window.location.pathname;
+let mode = 'default';
+if (path.includes('/panel')) mode = 'panel';
+if (path.includes('/speaker')) mode = 'speaker';
+
+if (mode === 'panel') {
+    muteBtn.style.display = 'inline-block';
+    let isActive = true;
+    muteBtn.onclick = () => {
+        isActive = !isActive;
+        muteBtn.textContent = isActive ? "DOS: ACTIVE" : "DOS: MUTED";
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "mute_toggle", enabled: isActive }));
+        }
+    };
+}
+
+if (mode === 'speaker') {
+    summaryBtn.onclick = () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "trigger_summary" }));
+            summaryBtn.disabled = true;
+            summaryBtn.textContent = "GENERATING...";
+        }
+    };
+}
 const audioElement = document.getElementById('simli-audio');
 const avatarFrame = document.getElementById('avatarFrame');
 const canvas = document.getElementById('audio-visualizer');
@@ -172,11 +202,14 @@ connectBtn.onclick = async () => {
 
         // 3. Connect to Backend WebSocket
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${location.host}/ws`);
+        ws = new WebSocket(`${protocol}//${location.host}/ws?mode=${mode}`);
         ws.binaryType = 'arraybuffer';
 
         ws.onopen = () => {
             isConnected = true;
+            if (mode === 'speaker') {
+                summaryBtn.style.display = 'inline-block';
+            }
             statusDiv.textContent = 'SYSTEM: CONNECTED';
             statusDiv.style.color = "var(--acid-green)";
             disconnectBtn.disabled = false;
