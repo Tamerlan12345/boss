@@ -15,6 +15,8 @@ class SpeakerIdentifier:
         self.sample_rate = 16000
         self.window_size = 1.5 # Window size for embedding extraction
         self.step_size = 0.5   # Stride
+        self.check_interval = int(self.step_size * self.sample_rate)
+        self.samples_processed = 0
         self.last_identification = None
 
         if encoder:
@@ -79,18 +81,16 @@ class SpeakerIdentifier:
         # Ideally we want a sliding window.
 
         required_samples = int(self.window_size * self.sample_rate)
+        chunk_samples = len(float32_data)
+        self.samples_processed += chunk_samples
 
-        if len(self.buffer) >= required_samples:
+        if len(self.buffer) >= required_samples and self.samples_processed >= self.check_interval:
             # Take the last window
             segment = self.buffer[-required_samples:]
 
             # We optimize by not running every single chunk, maybe every 0.5s worth of chunks?
-            # But the caller calls this frequently.
-            # For simplicity, let's just try to run it on the segment.
-            # VoiceEncoder is reasonably fast on CPU.
-
-            # To avoid spamming, we can throttle here, but let's just return the result
-            # and let the caller handle change detection.
+            # Now we implement the optimization using check_interval (stride)
+            self.samples_processed = 0
 
             embedding = self.encoder.embed_utterance(segment)
 
