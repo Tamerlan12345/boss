@@ -2,6 +2,19 @@ import unittest
 import numpy as np
 import sys
 import os
+from unittest.mock import MagicMock
+
+# Mock heavy dependencies before importing app modules
+mock_resemblyzer = MagicMock()
+mock_resemblyzer.VoiceEncoder = MagicMock
+mock_resemblyzer.preprocess_wav = MagicMock
+sys.modules['resemblyzer'] = mock_resemblyzer
+
+mock_torchaudio = MagicMock()
+sys.modules['torchaudio'] = mock_torchaudio
+
+mock_soundfile = MagicMock()
+sys.modules['soundfile'] = mock_soundfile
 
 # Add app to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
