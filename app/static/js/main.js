@@ -12,6 +12,8 @@ const connectBtn = document.getElementById('connectBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
 const muteBtn = document.getElementById('muteBtn');
 const summaryBtn = document.getElementById('summaryBtn');
+const introBtn = document.getElementById('introBtn');
+const activeToggleBtn = document.getElementById('activeToggleBtn');
 const statusDiv = document.getElementById('status');
 const logsDiv = document.getElementById('logs');
 const videoElement = document.getElementById('simli-video');
@@ -40,6 +42,24 @@ if (mode === 'speaker') {
             ws.send(JSON.stringify({ type: "trigger_summary" }));
             summaryBtn.disabled = true;
             summaryBtn.textContent = "GENERATING...";
+        }
+    };
+
+    introBtn.onclick = () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "trigger_introduce" }));
+        }
+    };
+
+    let isDosActive = false;
+    activeToggleBtn.onclick = () => {
+        isDosActive = !isDosActive;
+        activeToggleBtn.textContent = isDosActive ? "Режим: АКТИВНЫЙ" : "Режим: ПАССИВНЫЙ";
+        activeToggleBtn.style.backgroundColor = isDosActive ? "var(--acid-green)" : "";
+        activeToggleBtn.style.color = isDosActive ? "#000" : "";
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "toggle_active", enabled: isDosActive }));
         }
     };
 }
@@ -209,6 +229,11 @@ connectBtn.onclick = async () => {
             isConnected = true;
             if (mode === 'speaker') {
                 summaryBtn.style.display = 'inline-block';
+                introBtn.style.display = 'inline-block';
+                activeToggleBtn.style.display = 'inline-block';
+
+                // Initialize in Passive Mode
+                ws.send(JSON.stringify({ type: "toggle_active", enabled: false }));
             }
             statusDiv.textContent = 'SYSTEM: CONNECTED';
             statusDiv.style.color = "var(--acid-green)";
