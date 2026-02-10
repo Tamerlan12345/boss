@@ -89,7 +89,11 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
     loop = asyncio.get_running_loop()
 
     # State for Panel Mode
-    state = {"speaking_enabled": True}
+    state = {
+        "speaking_enabled": True,
+        "speaker_active": False,  # Default to Passive for Speaker Mode
+        "processing_summary": False
+    }
 
     try:
         # Determine System Instruction based on Mode
@@ -198,10 +202,13 @@ BEHAVIOR:
                                 elif msg_data.get("type") == "toggle_active":
                                     if mode == "speaker":
                                         enabled = msg_data.get("enabled", False)
+                                        state["speaker_active"] = enabled
                                         if enabled:
                                             await gemini_client.send_text("System Update: Switch to MODE B: [ACTIVE_INTERACTION]")
                                         else:
-                                            await gemini_client.send_text("System Update: Switch to MODE A: [PASSIVE_LISTENING]")
+                                            await gemini_client.send_text(
+                                                "URGENT COMMAND: ENTER PASSIVE MODE. DO NOT SPEAK. Output [SILENCE] until further notice."
+                                            )
 
                                 elif msg_data.get("type") == "trigger_introduce":
                                     if mode == "speaker":
@@ -210,7 +217,8 @@ BEHAVIOR:
                                 elif msg_data.get("type") == "trigger_summary":
                                     logger.info("Triggering summary generation...")
                                     if mode == "speaker":
-                                        await gemini_client.send_text("[CMD: SUMMARIZE]")
+                                        state["processing_summary"] = True
+                                        await gemini_client.send_text("[CMD: SUMMARIZE] Generate summary now. Output [SILENCE] when finished.")
                                     else:
                                         prompt = (
                                             "Проанализируй всё услышанное обсуждение. "
@@ -261,6 +269,11 @@ BEHAVIOR:
                         if mode == "panel" and not state["speaking_enabled"]:
                             continue
 
+                        # Filter out audio in Speaker Mode if Passive (unless processing summary)
+                        if mode == "speaker":
+                            if not state["speaker_active"] and not state["processing_summary"]:
+                                continue
+
                         if is_silenced: continue
                         resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
                         if resampled_audio:
@@ -272,6 +285,10 @@ BEHAVIOR:
                     elif isinstance(chunk, str):
                         if "[SILENCE]" in chunk:
                             is_silenced = True
+                            # Reset summary processing flag
+                            if mode == "speaker":
+                                state["processing_summary"] = False
+
                             audio_buffer.clear()
                             logger.info("Silence token received.")
                         else:
@@ -283,7 +300,14 @@ BEHAVIOR:
                 # Отправляем остатки аудио
                 if len(audio_buffer) > 0 and not is_silenced:
                     # Check mute again for remaining buffer
-                    if not (mode == "panel" and not state["speaking_enabled"]):
+                    should_send = True
+                    if mode == "panel" and not state["speaking_enabled"]:
+                        should_send = False
+                    elif mode == "speaker":
+                        if not state["speaker_active"] and not state["processing_summary"]:
+                            should_send = False
+
+                    if should_send:
                         await websocket.send_bytes(bytes(audio_buffer))
 
             except Exception as e:
