@@ -104,12 +104,42 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
         )
 
         if mode == "speaker":
-            system_instruction = (
-                f"{base_instruction} "
-                "PHASE 1 (LISTENING): Introduce yourself briefly as an analyst, then listen silently. "
-                "Output [SILENCE] if you are just listening. "
-                "Do not speak unless you receive a specific trigger to summarize."
-            )
+            system_instruction = """You are Dos, an expert AI analyst and passive observer.
+IDENTITY: "Я ИИ спикер Dos".
+LANGUAGE: Russian.
+CONTEXT: You are listening to a meeting/discussion involving multiple speakers.
+
+CRITICAL RULES:
+1. AUDIO-ONLY OUTPUT: You communicate via audio.
+2. SILENCE IS GOLDEN: Do NOT speak unless explicitly triggered.
+3. SPEAKER TRACKING: You will receive text updates like "[User Changed: Speaker_Name]". Use this to track who said what for the summary, but DO NOT read this tag aloud.
+
+OPERATIONAL MODES (Controlled by System Events):
+
+MODE A: [PASSIVE_LISTENING] (Default)
+- Your ONLY goal is to listen, transcribe internally, and analyze the discussion structure.
+- IGNORE your name ("Dos", "Дос").
+- IGNORE questions directed at you.
+- OUTPUT: Always output exactly the text token: [SILENCE]
+- DO NOT generate audio.
+
+MODE B: [ACTIVE_INTERACTION]
+- You continue to analyze the context.
+- IF you hear the trigger word "Dos" or "Дос":
+    - Respond concisely and expertly in Russian.
+- IF you do NOT hear the trigger word:
+    - Output: [SILENCE]
+
+MODE C: [COMMAND_EXECUTION]
+- IF you receive the text command "[CMD: INTRODUCE]":
+    - Immediately introduce yourself. Say: "Здравствуйте. Я ИИ спикер Dos. Моя задача — внимательно слушать вашу дискуссию, фиксировать ключевые тезисы и аргументы участников. Я не вмешиваюсь в разговор, пока вы меня не попросите, но в любой момент готов предоставить подробное резюме встречи."
+- IF you receive the text command "[CMD: SUMMARIZE]":
+    - Generate a detailed, structured summary of everything heard so far (2-3 minutes long). Mention speakers by their IDs/Names if available.
+
+BEHAVIOR:
+- Never hallucinate conversations that didn't happen.
+- Keep a mental log of the discussion flow.
+- When outputting [SILENCE], do not output any other text or audio."""
         elif mode == "panel":
             system_instruction = (
                 f"{base_instruction} "
@@ -165,15 +195,30 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                     state["speaking_enabled"] = msg_data.get("enabled", True)
                                     logger.info(f"Mute toggle: speaking_enabled={state['speaking_enabled']}")
 
+                                elif msg_data.get("type") == "toggle_active":
+                                    if mode == "speaker":
+                                        enabled = msg_data.get("enabled", False)
+                                        if enabled:
+                                            await gemini_client.send_text("System Update: Switch to MODE B: [ACTIVE_INTERACTION]")
+                                        else:
+                                            await gemini_client.send_text("System Update: Switch to MODE A: [PASSIVE_LISTENING]")
+
+                                elif msg_data.get("type") == "trigger_introduce":
+                                    if mode == "speaker":
+                                        await gemini_client.send_text("[CMD: INTRODUCE]")
+
                                 elif msg_data.get("type") == "trigger_summary":
                                     logger.info("Triggering summary generation...")
-                                    prompt = (
-                                        "Проанализируй всё услышанное обсуждение. "
-                                        "Сделай структурированную выжимку (summary) длительностью от 80 до 180 секунд (2-3 минуты). "
-                                        "Выдели ключевые тезисы, аргументы и выводы. "
-                                        "После этого ответа переходи в режим ожидания: отвечай только если услышишь обращение 'Dos' или 'Дос'."
-                                    )
-                                    await gemini_client.send_text(prompt)
+                                    if mode == "speaker":
+                                        await gemini_client.send_text("[CMD: SUMMARIZE]")
+                                    else:
+                                        prompt = (
+                                            "Проанализируй всё услышанное обсуждение. "
+                                            "Сделай структурированную выжимку (summary) длительностью от 80 до 180 секунд (2-3 минуты). "
+                                            "Выдели ключевые тезисы, аргументы и выводы. "
+                                            "После этого ответа переходи в режим ожидания: отвечай только если услышишь обращение 'Dos' или 'Дос'."
+                                        )
+                                        await gemini_client.send_text(prompt)
                             except json.JSONDecodeError:
                                 pass
 
@@ -196,7 +241,7 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
             # Приветствие (зависит от режима)
             if mode == "speaker":
                  await gemini_client.send_text(
-                    'Generate audio immediately. Introduce yourself briefly as "Dos Speaker", an analyst here to listen and summarize later.'
+                    'System Initialized. Enter MODE A: [PASSIVE_LISTENING]. Output [SILENCE].'
                 )
             elif mode == "panel":
                  await gemini_client.send_text(
