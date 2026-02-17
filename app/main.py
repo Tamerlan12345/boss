@@ -137,6 +137,7 @@ MODE B: [ACTIVE_INTERACTION]
 MODE C: [COMMAND_EXECUTION]
 - IF you receive the text command "[CMD: INTRODUCE]":
     - Immediately introduce yourself. Say: "Здравствуйте. Я ИИ спикер Dos. Моя задача — внимательно слушать вашу дискуссию, фиксировать ключевые тезисы и аргументы участников. Я не вмешиваюсь в разговор, пока вы меня не попросите, но в любой момент готов предоставить подробное резюме встречи."
+    - Output: [SILENCE]
 - IF you receive the text command "[CMD: SUMMARIZE]":
     - Generate a detailed, structured summary of everything heard so far (2-3 minutes long). Mention speakers by their IDs/Names if available.
 
@@ -188,7 +189,7 @@ BEHAVIOR:
                                 logger.info(f"Speaker changed to: {speaker}")
                                 await gemini_client.send_text(f"[User Changed: {speaker}]")
                             
-                            # Отправка аудио в Gemini
+                            # Отправка аудио в Gemini (Context Preservation: Always send audio regardless of Mute state)
                             await gemini_client.send_audio(data)
                         
                         elif "text" in message:
@@ -203,8 +204,14 @@ BEHAVIOR:
                                     if mode == "speaker":
                                         enabled = msg_data.get("enabled", False)
                                         state["speaker_active"] = enabled
+
+                                        async def activation_sequence():
+                                            await asyncio.sleep(3)
+                                            await gemini_client.send_text("[CMD: INTRODUCE]")
+
                                         if enabled:
-                                            await gemini_client.send_text("System Update: Switch to MODE B: [ACTIVE_INTERACTION]")
+                                            # Запускаем задачу активации в фоне, чтобы не блокировать loop
+                                            asyncio.create_task(activation_sequence())
                                         else:
                                             await gemini_client.send_text(
                                                 "URGENT COMMAND: ENTER PASSIVE MODE. DO NOT SPEAK. Output [SILENCE] until further notice."
@@ -239,6 +246,7 @@ BEHAVIOR:
             """Отправляет ответы клиенту."""
             loop = asyncio.get_running_loop()
             audio_buffer = bytearray()
+            summary_audio_buffer = bytearray()
             MIN_CHUNK_SIZE = 4096
             is_silenced = False
 
@@ -265,18 +273,40 @@ BEHAVIOR:
                 # Стандартный цикл чтения (без прерываний)
                 async for chunk in gemini_client.receive():
                     if isinstance(chunk, bytes):
-                        # Filter out audio if muted in Panel mode
+                        # Авто-сброс флага тишины при получении аудио (новая фраза или ответ)
+                        is_silenced = False
+
+                        should_buffer = False
+                        should_send = True
+
+                        # Логика Panel Mode
                         if mode == "panel" and not state["speaking_enabled"]:
+                            should_send = False
+
+                        # Логика Speaker Mode
+                        if mode == "speaker":
+                            if not state["speaker_active"]:
+                                if state["processing_summary"]:
+                                    # Пассивный режим + Генерация саммари -> Буферизация
+                                    should_buffer = True
+                                    should_send = False
+                                else:
+                                    # Пассивный режим -> Игнорируем аудио
+                                    should_send = False
+
+                        if is_silenced:
+                            should_send = False
+
+                        if not should_send and not should_buffer:
                             continue
 
-                        # Filter out audio in Speaker Mode if Passive (unless processing summary)
-                        if mode == "speaker":
-                            if not state["speaker_active"] and not state["processing_summary"]:
-                                continue
-
-                        if is_silenced: continue
                         resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
-                        if resampled_audio:
+
+                        if should_buffer and resampled_audio:
+                            summary_audio_buffer.extend(resampled_audio)
+                            continue
+
+                        if should_send and resampled_audio:
                             audio_buffer.extend(resampled_audio)
                             if len(audio_buffer) >= MIN_CHUNK_SIZE:
                                 await websocket.send_bytes(bytes(audio_buffer))
@@ -285,11 +315,18 @@ BEHAVIOR:
                     elif isinstance(chunk, str):
                         if "[SILENCE]" in chunk:
                             is_silenced = True
-                            # Reset summary processing flag
-                            if mode == "speaker":
-                                state["processing_summary"] = False
+                            audio_buffer.clear() # Очищаем текущий буфер вывода
 
-                            audio_buffer.clear()
+                            if mode == "speaker":
+                                # Генерация саммари завершена
+                                if state["processing_summary"]:
+                                    state["processing_summary"] = False
+
+                                # Если мы активны и есть буфер саммари (сценарий: Intro завершилось -> Саммари)
+                                if state["speaker_active"] and len(summary_audio_buffer) > 0:
+                                    await websocket.send_bytes(bytes(summary_audio_buffer))
+                                    summary_audio_buffer.clear()
+
                             logger.info("Silence token received.")
                         else:
                             if chunk.strip(): is_silenced = False
