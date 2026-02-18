@@ -273,6 +273,12 @@ connectBtn.onclick = async () => {
                     const msg = JSON.parse(event.data);
                     if (msg.type === 'log') {
                         appendToLog(msg.role, msg.text);
+                    } else if (msg.type === "summary_complete") {
+                        if (summaryBtn) {
+                            summaryBtn.disabled = false;
+                            summaryBtn.textContent = "GENERATE SUMMARY";
+                        }
+                        appendToLog('SYSTEM', 'Summary generation complete. Ready to play on activation.');
                     } else {
                         appendToLog('UNKNOWN', event.data);
                     }
