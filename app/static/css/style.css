@@ -276,3 +276,15 @@ button {
     .main-logo { max-width: 180px; }
     .live-badge { font-size: 9px; }
 }
+
+button:disabled,
+.primary-btn:disabled,
+.secondary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.8);
+    transform: none !important;
+    box-shadow: none !important;
+    background: #333 !important; /* Серый фон для понимания, что нажато */
+    color: #888 !important;
+}
