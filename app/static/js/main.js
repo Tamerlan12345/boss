@@ -280,6 +280,10 @@ connectBtn.onclick = async () => {
                     const msg = JSON.parse(event.data);
                     if (msg.type === 'log') {
                         appendToLog(msg.role, msg.text);
+                    } else if (msg.type === 'summary_done') {
+                        summaryBtn.disabled = false;
+                        summaryBtn.textContent = "GENERATE SUMMARY";
+                        appendToLog('SYSTEM', "Summary generation complete.");
                     } else {
                         appendToLog('UNKNOWN', event.data);
                     }
@@ -307,6 +311,13 @@ connectBtn.onclick = async () => {
 };
 
 disconnectBtn.onclick = () => {
+    // Terminate Session Completely
     if (ws) ws.close();
     if (avatar) avatar.close();
+    if (audioContext) {
+        audioContext.close();
+    }
+    statusDiv.textContent = 'SESSION TERMINATED';
+    statusDiv.style.color = "var(--text-color)";
+    appendToLog('SYSTEM', 'Session Terminated by User.');
 };

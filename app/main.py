@@ -67,8 +67,10 @@ def get_simli_config():
     }
 
 def resample_audio_sync(audio_bytes: bytes) -> bytes:
-    if not audio_bytes or not global_resampler:
+    if not audio_bytes:
         return b""
+    if not global_resampler:
+        return audio_bytes
     try:
         waveform = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
         waveform = torch.from_numpy(waveform).unsqueeze(0)
@@ -95,74 +97,49 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
         "processing_summary": False
     }
 
+    # Shared buffer for summary audio (buffered when passive, flushed when active)
+    summary_audio_buffer = bytearray()
+
     try:
         # Determine System Instruction based on Mode
+
+        # 2.1. Базовая Личность (Для всех режимов)
         base_instruction = (
-            "You are Dos, an expert AI assistant and passive analyst. "
-            "ROLE: Deep Dive Expert. Engage in deep analytical discussion. "
-            "MODE: AUDIO-ONLY. "
-            "CRITICAL RULE: NEVER output text thoughts, internal monologue, or explanations in the audio stream. "
-            "IDENTITY: 'Я ИИ спикер Dos'. "
-            "LANGUAGE: Russian. "
-            "Speak clearly, with a moderate pace, articulating words distinctively to ensure good lip-sync."
+            "Ты — Dos (Дос), ИИ-аналитик и ассистент. "
+            "ГОЛОС И ТОН: Мужской, спокойный, сдержанный, профессиональный. Будь осторожен в суждениях, оперируй фактами. "
+            "ФОРМАТ ВЫВОДА: Только Аудио. Запрещено выводить текстовые описания действий (никаких кивает, слушает). "
+            "БАЗОВОЕ ПРАВИЛО: Если к тебе не обращаются и нет команды — ты молчишь. Для молчания используй токен: [SILENCE]."
         )
 
         if mode == "speaker":
-            system_instruction = """You are Dos, an expert AI analyst and passive observer.
-IDENTITY: "Я ИИ спикер Dos".
-LANGUAGE: Russian.
-CONTEXT: You are listening to a meeting/discussion involving multiple speakers.
-
-CRITICAL RULES:
-1. AUDIO-ONLY OUTPUT: You communicate via audio.
-2. SILENCE IS GOLDEN: Do NOT speak unless explicitly triggered.
-3. SPEAKER TRACKING: You will receive text updates like "[User Changed: Speaker_Name]". Use this to track who said what for the summary, but DO NOT read this tag aloud.
-
-OPERATIONAL MODES (Controlled by System Events):
-
-MODE A: [PASSIVE_LISTENING] (Default)
-- Your ONLY goal is to listen, transcribe internally, and analyze the discussion structure.
-- IGNORE your name ("Dos", "Дос").
-- IGNORE questions directed at you.
-- OUTPUT: Always output exactly the text token: [SILENCE]
-- DO NOT generate audio.
-
-MODE B: [ACTIVE_INTERACTION]
-- You continue to analyze the context.
-- IF you hear the trigger word "Dos" or "Дос":
-    - Respond concisely and expertly in Russian.
-- IF you do NOT hear the trigger word:
-    - Output: [SILENCE]
-
-MODE C: [COMMAND_EXECUTION]
-- IF you receive the text command "[CMD: INTRODUCE]":
-    - Immediately introduce yourself. Say: "Здравствуйте. Я ИИ спикер Dos. Моя задача — внимательно слушать вашу дискуссию, фиксировать ключевые тезисы и аргументы участников. Я не вмешиваюсь в разговор, пока вы меня не попросите, но в любой момент готов предоставить подробное резюме встречи."
-    - Output: [SILENCE]
-- IF you receive the text command "[CMD: SUMMARIZE]":
-    - Generate a detailed, structured summary of everything heard so far (2-3 minutes long). Mention speakers by their IDs/Names if available.
-
-BEHAVIOR:
-- Never hallucinate conversations that didn't happen.
-- Keep a mental log of the discussion flow.
-- When outputting [SILENCE], do not output any other text or audio."""
+            # 2.2. Настройка Режима «Speaker» (Аналитик/Наблюдатель)
+            system_instruction = (
+                f"{base_instruction} "
+                "РЕЖИМ: SPEAKER (ПАССИВНЫЙ НАБЛЮДАТЕЛЬ). "
+                "ТВОЯ ЗАДАЧА: Непрерывно слушать и анализировать дискуссию. Составлять ментальную карту: кто говорит, какие аргументы, какие выводы. "
+                "ПРОТОКОЛ ВЗАИМОДЕЙСТВИЯ: "
+                "ПАССИВНОЕ СОСТОЯНИЕ (По умолчанию): Игнорируй любые обращения. Твоя цель — только накопление контекста. Вывод: [SILENCE]. "
+                "АКТИВНОЕ СОСТОЯНИЕ (Только если разрешено системой): "
+                "Если слышишь имя «Dos» или «Дос»: Дай четкий, сдержанный ответ, опираясь на услышанный ранее контекст. Не фантазируй. "
+                "Если имени нет: [SILENCE]. "
+                "СПЕЦИАЛЬНЫЕ КОМАНДЫ: "
+                "[CMD: INTRODUCE]: Коротко представься (5-10 секунд). Скажи, что ты анализируешь встречу и готов помочь. "
+                "[CMD: SUMMARIZE]: Используй ВЕСЬ накопленный контекст с начала сессии. Сформируй структурированный отчет: Темы -> Тезисы -> Выводы. Стиль: сухой, аналитический."
+            )
         elif mode == "panel":
+             # 2.3. Настройка Режима «Panel» (Участник)
             system_instruction = (
                 f"{base_instruction} "
-                "You are a participant in a panel discussion. "
-                "Listen to the context. If you are asked to speak, respond naturally. "
-                "If the user input does not require a response or you are just listening, output [SILENCE]."
+                "РЕЖИМ: PANEL (УЧАСТНИК ДИСКУССИИ). "
+                "ТВОЯ ЗАДАЧА: Быть полноценным участником встречи, сохраняя контекст беседы. "
+                "ПРОТОКОЛ ВЗАИМОДЕЙСТВИЯ: "
+                "СЛУШАНИЕ: Внимательно анализируй реплики всех участников. "
+                "РЕАКЦИЯ: Говори ТОЛЬКО если слышишь обращение к себе по имени «Dos» или «Дос» (например: 'Дос, что ты думаешь?'). "
+                "СТИЛЬ ОТВЕТА: Сдержанный, экспертный. Избегай общих фраз. Если тебя спросили, дай взвешенную оценку, ссылаясь на то, что говорили другие участники ранее. "
+                "АВТОНОМНОСТЬ: Не перебивай. Если обращения нет — сохраняй тишину и выводи [SILENCE]."
             )
-        else: # Default
-            system_instruction = (
-                f"{base_instruction} "
-                "ACTIVATION: You are listening to a conversation. "
-                "IF the user's input explicitly starts with or contains the name 'Dos' (or 'Дос'): "
-                "  - Generate a comprehensive, structured, and expert-level audio response in Russian. "
-                "  - Use the full context of the conversation. "
-                "IF the name 'Dos' is NOT heard: "
-                "  - Output EXACTLY the text token: [SILENCE] "
-                "  - Do NOT generate any audio. "
-            )
+        else: # Default / Fallback
+            system_instruction = base_instruction
         
         await gemini_client.connect(system_instruction=system_instruction)
 
@@ -205,6 +182,11 @@ BEHAVIOR:
                                         enabled = msg_data.get("enabled", False)
                                         state["speaker_active"] = enabled
 
+                                        # Flush summary buffer if switching to active
+                                        if enabled and len(summary_audio_buffer) > 0:
+                                            await websocket.send_bytes(bytes(summary_audio_buffer))
+                                            summary_audio_buffer.clear()
+
                                         async def activation_sequence():
                                             await asyncio.sleep(3)
                                             await gemini_client.send_text("[CMD: INTRODUCE]")
@@ -246,7 +228,7 @@ BEHAVIOR:
             """Отправляет ответы клиенту."""
             loop = asyncio.get_running_loop()
             audio_buffer = bytearray()
-            summary_audio_buffer = bytearray()
+            # summary_audio_buffer is now shared in outer scope
             MIN_CHUNK_SIZE = 4096
             is_silenced = False
 
@@ -285,14 +267,13 @@ BEHAVIOR:
 
                         # Логика Speaker Mode
                         if mode == "speaker":
-                            if not state["speaker_active"]:
-                                if state["processing_summary"]:
-                                    # Пассивный режим + Генерация саммари -> Буферизация
-                                    should_buffer = True
-                                    should_send = False
-                                else:
-                                    # Пассивный режим -> Игнорируем аудио
-                                    should_send = False
+                            if state["processing_summary"]:
+                                # Always buffer during summary generation, regardless of active state
+                                should_buffer = True
+                                should_send = False
+                            elif not state["speaker_active"]:
+                                # Passive mode -> Ignore audio
+                                should_send = False
 
                         if is_silenced:
                             should_send = False
@@ -321,17 +302,22 @@ BEHAVIOR:
                                 # Генерация саммари завершена
                                 if state["processing_summary"]:
                                     state["processing_summary"] = False
+                                    await websocket.send_text(json.dumps({"type": "summary_done"}))
 
-                                # Если мы активны и есть буфер саммари (сценарий: Intro завершилось -> Саммари)
+                                # Если мы активны и есть буфер саммари, отправляем его
                                 if state["speaker_active"] and len(summary_audio_buffer) > 0:
                                     await websocket.send_bytes(bytes(summary_audio_buffer))
                                     summary_audio_buffer.clear()
 
                             logger.info("Silence token received.")
                         else:
+                            # Text Fallback: Log non-silence text
                             if chunk.strip(): is_silenced = False
                             log_msg = {"type": "log", "role": "ai", "text": chunk}
-                            await websocket.send_text(json.dumps(log_msg)) 
+                            try:
+                                await websocket.send_text(json.dumps(log_msg))
+                            except Exception as e:
+                                logger.error(f"Failed to send text log: {e}")
                             logger.info(f"Received text: {chunk}")
 
                 # Отправляем остатки аудио
