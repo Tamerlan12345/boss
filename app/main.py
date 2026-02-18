@@ -99,7 +99,7 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
     }
 
     # Shared buffer for summary audio (buffered when passive, flushed when active)
-    summary_audio_buffer = bytearray()
+    summary_buffer = bytearray()
 
     try:
         # Determine System Instruction based on Mode
@@ -113,11 +113,11 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                 "Основной переключатель поведения.\n"
                 "Пассивный (по умолчанию): ИИ просто слушает обсуждение, фиксирует, кто и что говорит, анализирует контекст, но сам не вступает в разговор.\n"
                 "Активный: ИИ готов отвечать на вопросы, если услышит обращение к себе по имени «Dos» или «Дос». – это важно, если ДОС нет в предложении ИИ не будет отвечать.\n\n"
-                "КОМАНДЫ:\n"
-                "1. Представиться ([CMD: INTRODUCE]): ИИ выйдет в эфир и коротко расскажет о своей роли.\n"
-                "2. GENERATE SUMMARY ([CMD: SUMMARIZE]): Инструмент аналитики. После завершения обсуждения ИИ подготовит и выдаст структурированное голосовое резюме (саммари) всей сессии с основными тезисами.\n"
-                "3. TERMINATE: Завершение сессии и отключение связи.\n\n"
-                "ВАЖНО: Выводи [SILENCE], если нет прямого обращения \"Dos\" в активном режиме."
+                "Представиться: Кнопка для быстрой проверки связи. ИИ выйдет в эфир и коротко расскажет о своей роли.\n\n"
+                "GENERATE SUMMARY:\n"
+                "Инструмент аналитики. После завершения обсуждения нажми эту кнопку и ИИ подготовит и выдаст структурированное голосовое резюме (саммари) всей сессии с основными тезисами.\n\n"
+                "TERMINATE: Завершение сессии и отключение связи.\n\n"
+                "ВАЖНО: Если к тебе не обращаются по имени в активном режиме — выводи токен [SILENCE]."
             )
         elif mode == "panel":
             system_instruction = (
@@ -125,10 +125,8 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                 "Этот режим подходит для активного участия ИИ в обсуждении в качестве одного из спикеров.\n\n"
                 "Участие в диалоге:\n"
                 "В этом режиме ИИ настроен как полноценный участник панели. Он слушает контекст и, если к нему обращаются или тема требует его экспертного участия, он отвечает естественным образом.\n\n"
-                "Кнопка Mute (DOS: ACTIVE/MUTED):\n"
-                "Позволяет временно «выключить» голос ИИ, если нужно, чтобы он продолжал слушать и анализировать, но гарантированно не перебивал участников.\n\n"
-                "Автономность:\n"
-                "Если вводные данные не требуют ответа, ИИ будет сохранять тишину, продолжая следить за нитью разговора. Жди указания к действию через «ДОС, что ты думаешь по этому поводу?».\n"
+                "Кнопка Mute (DOS: ACTIVE/MUTED): Позволяет временно «выключить» голос ИИ, если нужно, чтобы он продолжал слушать и анализировать, но гарантированно не перебивал участников.\n\n"
+                "Автономность: Если вводные данные не требуют ответа, ИИ будет сохранять тишину, продолжая следить за нитью разговора, тут так же стоит промт на то что-бы был указ к действию через ДОС «ДОС что ты думаешь по этому поводу?».\n"
                 "Будь собранным и осторожным в высказываниях."
             )
         else:
@@ -179,6 +177,12 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                             await gemini_client.send_text(
                                                 "URGENT COMMAND: ENTER PASSIVE MODE. DO NOT SPEAK. Output [SILENCE] until further notice."
                                             )
+                                        else:
+                                            # If enabling active mode, flush buffer if any
+                                            if len(summary_buffer) > 0:
+                                                logger.info(f"Flushing summary buffer: {len(summary_buffer)} bytes")
+                                                await websocket.send_bytes(bytes(summary_buffer))
+                                                summary_buffer.clear()
 
                                 elif msg_data.get("type") == "trigger_introduce":
                                     if mode == "speaker":
@@ -209,7 +213,7 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
         async def send_to_client():
             """Отправляет ответы клиенту."""
             loop = asyncio.get_running_loop()
-            audio_buffer = bytearray()
+            audio_buffer = bytearray() # Local buffer for chunking
             MIN_CHUNK_SIZE = 4096
             is_silenced = False
 
@@ -239,24 +243,24 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                         # Авто-сброс флага тишины при получении аудио (новая фраза или ответ)
                         is_silenced = False
                         should_send = True
+                        resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
 
-                        # Логика Panel Mode
-                        if mode == "panel" and not state["speaking_enabled"]:
-                            should_send = False
+                        # Логика Output Gating
+                        if mode == "panel":
+                            if not state["speaking_enabled"]:
+                                should_send = False
 
-                        # Логика Speaker Mode
-                        if mode == "speaker":
-                            # Блокируем, если не активны, КРОМЕ случаев выполнения команд (Intro/Summary)
-                            if not state["speaker_active"] and not state["intro_active"] and not state["processing_summary"]:
+                        elif mode == "speaker":
+                            if state["processing_summary"]:
+                                # Accumulate audio in buffer
+                                if resampled_audio:
+                                    summary_buffer.extend(resampled_audio)
+                                should_send = False
+                            elif not state["speaker_active"] and not state["intro_active"]:
                                 should_send = False
 
                         if is_silenced:
                             should_send = False
-
-                        if not should_send:
-                            continue
-
-                        resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
 
                         if should_send and resampled_audio:
                             audio_buffer.extend(resampled_audio)
@@ -274,6 +278,11 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                 if state["processing_summary"]:
                                     state["processing_summary"] = False
                                     await websocket.send_text(json.dumps({"type": "summary_done"}))
+
+                                    # Edge case: If active mode was enabled during generation, send buffer now
+                                    if state["speaker_active"] and len(summary_buffer) > 0:
+                                        await websocket.send_bytes(bytes(summary_buffer))
+                                        summary_buffer.clear()
 
                                 # Сброс флага Intro
                                 if state["intro_active"]:
@@ -296,7 +305,9 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                     if mode == "panel" and not state["speaking_enabled"]:
                         should_send = False
                     elif mode == "speaker":
-                         if not state["speaker_active"] and not state["intro_active"] and not state["processing_summary"]:
+                         if state["processing_summary"]:
+                             should_send = False # Already buffered
+                         elif not state["speaker_active"] and not state["intro_active"]:
                             should_send = False
 
                     if should_send:
