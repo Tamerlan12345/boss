@@ -141,7 +141,8 @@ class SimliAvatar {
                 videoRef: this.videoElement,
                 audioRef: this.audioElement,
                 enableConsoleLogs: true,
-                // Verified ICE Servers configuration for WebRTC
+                // !!! КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ НИЖЕ !!!
+                // Без этой строчки P2P соединение падает с ошибкой Ice Servers Required
                 iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
             };
 
