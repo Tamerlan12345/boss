@@ -141,6 +141,7 @@ class SimliAvatar {
                 videoRef: this.videoElement,
                 audioRef: this.audioElement,
                 enableConsoleLogs: true,
+                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
             };
 
             appendToLog('SYSTEM', "Initializing Simli Client...");
