@@ -1,4 +1,4 @@
-import { SimliClient } from 'https://esm.sh/simli-client@1.2.0';
+import { SimliClient } from 'https://esm.sh/simli-client@2.0.0-rc.0';
 
 let audioContext;
 let ws;
