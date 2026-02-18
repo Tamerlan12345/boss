@@ -268,15 +268,6 @@ connectBtn.onclick = async () => {
         ws.onmessage = async (event) => {
             if (event.data instanceof ArrayBuffer) {
                 // Audio
-                if (audioContext && audioContext.state === 'suspended') {
-                    await audioContext.resume();
-                }
-                const videoEl = document.getElementById('simli-video');
-                if (videoEl) {
-                    videoEl.style.border = '2px solid #00ff00';
-                    setTimeout(() => videoEl.style.border = 'none', 100);
-                }
-
                 const uint8 = new Uint8Array(event.data);
                 if (avatar) {
                     avatar.speak(uint8);

@@ -31,7 +31,6 @@ class GeminiClient:
             "setup": {
                 "model": "models/gemini-2.5-flash-native-audio-preview-12-2025",
                 "generationConfig": {
-                    # Explicitly force AUDIO only to prevent text responses
                     "responseModalities": ["AUDIO"],
                     "speechConfig": {
                         "voiceConfig": {
