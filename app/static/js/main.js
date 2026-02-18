@@ -1,4 +1,4 @@
-import { SimliClient } from 'https://esm.sh/simli-client@latest';
+import { SimliClient } from 'https://esm.sh/simli-client@1.2.20';
 
 let audioContext;
 let ws;
@@ -149,15 +149,9 @@ class SimliAvatar {
 
             appendToLog('SYSTEM', "Initializing Simli Client...");
 
-            // Instantiate with config here
-            try {
-                this.simliClient = new SimliClient(simliConfig);
-            } catch (ctorErr) {
-                 console.warn("Constructor with config failed, trying without...", ctorErr);
-                 this.simliClient = new SimliClient();
-            }
-
+            this.simliClient = new SimliClient();
             this.simliClient.Initialize(simliConfig);
+            console.log('Simli Client:', this.simliClient);
 
             this.simliClient.on("connected", () => {
                 appendToLog('SYSTEM', "✅ Simli WebRTC Connected");
