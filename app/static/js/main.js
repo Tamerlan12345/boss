@@ -173,7 +173,13 @@ class SimliAvatar {
 
     start() {
         appendToLog('SYSTEM', "Starting Simli Session...");
-        this.simliClient.start();
+        
+        // Передаем iceServers именно сюда, в метод start
+        const config = {
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+        };
+        
+        this.simliClient.start(config);
     }
 
     speak(audioData) {
