@@ -1,4 +1,4 @@
-import { SimliClient } from 'https://esm.sh/simli-client@latest';
+import { SimliClient } from 'https://esm.sh/simli-client@1.2.0';
 
 let audioContext;
 let ws;
@@ -141,8 +141,6 @@ class SimliAvatar {
                 videoRef: this.videoElement,
                 audioRef: this.audioElement,
                 enableConsoleLogs: true,
-                // !!! КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ НИЖЕ !!!
-                // Без этой строчки P2P соединение падает с ошибкой Ice Servers Required
                 iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
             };
 
