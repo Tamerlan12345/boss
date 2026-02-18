@@ -94,7 +94,8 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
     state = {
         "speaking_enabled": True,
         "speaker_active": False,  # Default to Passive for Speaker Mode
-        "processing_summary": False
+        "processing_summary": False,
+        "intro_active": False
     }
 
     # Shared buffer for summary audio (buffered when passive, flushed when active)
@@ -103,43 +104,35 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
     try:
         # Determine System Instruction based on Mode
 
-        # 2.1. Базовая Личность (Для всех режимов)
-        base_instruction = (
-            "Ты — Dos (Дос), ИИ-аналитик и ассистент. "
-            "ГОЛОС И ТОН: Мужской, спокойный, сдержанный, профессиональный. Будь осторожен в суждениях, оперируй фактами. "
-            "ФОРМАТ ВЫВОДА: Только Аудио. Запрещено выводить текстовые описания действий (никаких кивает, слушает). "
-            "БАЗОВОЕ ПРАВИЛО: Если к тебе не обращаются и нет команды — ты молчишь. Для молчания используй токен: [SILENCE]."
-        )
-
+        # System Instructions
         if mode == "speaker":
-            # 2.2. Настройка Режима «Speaker» (Аналитик/Наблюдатель)
             system_instruction = (
-                f"{base_instruction} "
-                "РЕЖИМ: SPEAKER (ПАССИВНЫЙ НАБЛЮДАТЕЛЬ). "
-                "ТВОЯ ЗАДАЧА: Непрерывно слушать и анализировать дискуссию. Составлять ментальную карту: кто говорит, какие аргументы, какие выводы. "
-                "ПРОТОКОЛ ВЗАИМОДЕЙСТВИЯ: "
-                "ПАССИВНОЕ СОСТОЯНИЕ (По умолчанию): Игнорируй любые обращения. Твоя цель — только накопление контекста. Вывод: [SILENCE]. "
-                "АКТИВНОЕ СОСТОЯНИЕ (Только если разрешено системой): "
-                "Если слышишь имя «Dos» или «Дос»: Дай четкий, сдержанный ответ, опираясь на услышанный ранее контекст. Не фантазируй. "
-                "Если имени нет: [SILENCE]. "
-                "СПЕЦИАЛЬНЫЕ КОМАНДЫ: "
-                "[CMD: INTRODUCE]: Коротко представься (5-10 секунд). Скажи, что ты анализируешь встречу и готов помочь. "
-                "[CMD: SUMMARIZE]: Используй ВЕСЬ накопленный контекст с начала сессии. Сформируй структурированный отчет: Темы -> Тезисы -> Выводы. Стиль: сухой, аналитический."
+                "Режим «Speaker» (Аналитик и наблюдатель)\n"
+                "Этот режим предназначен для анализа выводов, где ИИ выступает в роли пассивного слушателя.\n\n"
+                "Режим: ПАССИВНЫЙ / АКТИВНЫЙ:\n"
+                "Основной переключатель поведения.\n"
+                "Пассивный (по умолчанию): ИИ просто слушает обсуждение, фиксирует, кто и что говорит, анализирует контекст, но сам не вступает в разговор.\n"
+                "Активный: ИИ готов отвечать на вопросы, если услышит обращение к себе по имени «Dos» или «Дос». – это важно, если ДОС нет в предложении ИИ не будет отвечать.\n\n"
+                "КОМАНДЫ:\n"
+                "1. Представиться ([CMD: INTRODUCE]): ИИ выйдет в эфир и коротко расскажет о своей роли.\n"
+                "2. GENERATE SUMMARY ([CMD: SUMMARIZE]): Инструмент аналитики. После завершения обсуждения ИИ подготовит и выдаст структурированное голосовое резюме (саммари) всей сессии с основными тезисами.\n"
+                "3. TERMINATE: Завершение сессии и отключение связи.\n\n"
+                "ВАЖНО: Выводи [SILENCE], если нет прямого обращения \"Dos\" в активном режиме."
             )
         elif mode == "panel":
-             # 2.3. Настройка Режима «Panel» (Участник)
             system_instruction = (
-                f"{base_instruction} "
-                "РЕЖИМ: PANEL (УЧАСТНИК ДИСКУССИИ). "
-                "ТВОЯ ЗАДАЧА: Быть полноценным участником встречи, сохраняя контекст беседы. "
-                "ПРОТОКОЛ ВЗАИМОДЕЙСТВИЯ: "
-                "СЛУШАНИЕ: Внимательно анализируй реплики всех участников. "
-                "РЕАКЦИЯ: Говори ТОЛЬКО если слышишь обращение к себе по имени «Dos» или «Дос» (например: 'Дос, что ты думаешь?'). "
-                "СТИЛЬ ОТВЕТА: Сдержанный, экспертный. Избегай общих фраз. Если тебя спросили, дай взвешенную оценку, ссылаясь на то, что говорили другие участники ранее. "
-                "АВТОНОМНОСТЬ: Не перебивай. Если обращения нет — сохраняй тишину и выводи [SILENCE]."
+                "Режим «Panel» (Участник дискуссии)\n"
+                "Этот режим подходит для активного участия ИИ в обсуждении в качестве одного из спикеров.\n\n"
+                "Участие в диалоге:\n"
+                "В этом режиме ИИ настроен как полноценный участник панели. Он слушает контекст и, если к нему обращаются или тема требует его экспертного участия, он отвечает естественным образом.\n\n"
+                "Кнопка Mute (DOS: ACTIVE/MUTED):\n"
+                "Позволяет временно «выключить» голос ИИ, если нужно, чтобы он продолжал слушать и анализировать, но гарантированно не перебивал участников.\n\n"
+                "Автономность:\n"
+                "Если вводные данные не требуют ответа, ИИ будет сохранять тишину, продолжая следить за нитью разговора. Жди указания к действию через «ДОС, что ты думаешь по этому поводу?».\n"
+                "Будь собранным и осторожным в высказываниях."
             )
-        else: # Default / Fallback
-            system_instruction = base_instruction
+        else:
+            system_instruction = "Ты — Dos (Дос), ИИ-аналитик и ассистент."
         
         await gemini_client.connect(system_instruction=system_instruction)
 
@@ -182,25 +175,14 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                         enabled = msg_data.get("enabled", False)
                                         state["speaker_active"] = enabled
 
-                                        # Flush summary buffer if switching to active
-                                        if enabled and len(summary_audio_buffer) > 0:
-                                            await websocket.send_bytes(bytes(summary_audio_buffer))
-                                            summary_audio_buffer.clear()
-
-                                        async def activation_sequence():
-                                            await asyncio.sleep(3)
-                                            await gemini_client.send_text("[CMD: INTRODUCE]")
-
-                                        if enabled:
-                                            # Запускаем задачу активации в фоне, чтобы не блокировать loop
-                                            asyncio.create_task(activation_sequence())
-                                        else:
+                                        if not enabled:
                                             await gemini_client.send_text(
                                                 "URGENT COMMAND: ENTER PASSIVE MODE. DO NOT SPEAK. Output [SILENCE] until further notice."
                                             )
 
                                 elif msg_data.get("type") == "trigger_introduce":
                                     if mode == "speaker":
+                                        state["intro_active"] = True
                                         await gemini_client.send_text("[CMD: INTRODUCE]")
 
                                 elif msg_data.get("type") == "trigger_summary":
@@ -228,7 +210,6 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
             """Отправляет ответы клиенту."""
             loop = asyncio.get_running_loop()
             audio_buffer = bytearray()
-            # summary_audio_buffer is now shared in outer scope
             MIN_CHUNK_SIZE = 4096
             is_silenced = False
 
@@ -257,8 +238,6 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                     if isinstance(chunk, bytes):
                         # Авто-сброс флага тишины при получении аудио (новая фраза или ответ)
                         is_silenced = False
-
-                        should_buffer = False
                         should_send = True
 
                         # Логика Panel Mode
@@ -267,25 +246,17 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
 
                         # Логика Speaker Mode
                         if mode == "speaker":
-                            if state["processing_summary"]:
-                                # Always buffer during summary generation, regardless of active state
-                                should_buffer = True
-                                should_send = False
-                            elif not state["speaker_active"]:
-                                # Passive mode -> Ignore audio
+                            # Блокируем, если не активны, КРОМЕ случаев выполнения команд (Intro/Summary)
+                            if not state["speaker_active"] and not state["intro_active"] and not state["processing_summary"]:
                                 should_send = False
 
                         if is_silenced:
                             should_send = False
 
-                        if not should_send and not should_buffer:
+                        if not should_send:
                             continue
 
                         resampled_audio = await loop.run_in_executor(None, resample_audio_sync, chunk)
-
-                        if should_buffer and resampled_audio:
-                            summary_audio_buffer.extend(resampled_audio)
-                            continue
 
                         if should_send and resampled_audio:
                             audio_buffer.extend(resampled_audio)
@@ -304,10 +275,9 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                     state["processing_summary"] = False
                                     await websocket.send_text(json.dumps({"type": "summary_done"}))
 
-                                # Если мы активны и есть буфер саммари, отправляем его
-                                if state["speaker_active"] and len(summary_audio_buffer) > 0:
-                                    await websocket.send_bytes(bytes(summary_audio_buffer))
-                                    summary_audio_buffer.clear()
+                                # Сброс флага Intro
+                                if state["intro_active"]:
+                                    state["intro_active"] = False
 
                             logger.info("Silence token received.")
                         else:
@@ -322,12 +292,11 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
 
                 # Отправляем остатки аудио
                 if len(audio_buffer) > 0 and not is_silenced:
-                    # Check mute again for remaining buffer
                     should_send = True
                     if mode == "panel" and not state["speaking_enabled"]:
                         should_send = False
                     elif mode == "speaker":
-                        if not state["speaker_active"] and not state["processing_summary"]:
+                         if not state["speaker_active"] and not state["intro_active"] and not state["processing_summary"]:
                             should_send = False
 
                     if should_send:
