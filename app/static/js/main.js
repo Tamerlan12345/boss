@@ -119,7 +119,7 @@ class SimliAvatar {
     constructor(videoEl, audioEl) {
         this.videoElement = videoEl;
         this.audioElement = audioEl;
-        this.simliClient = null;
+        this.simliClient = new SimliClient();
         this.config = null;
     }
 
@@ -141,22 +141,10 @@ class SimliAvatar {
                 videoRef: this.videoElement,
                 audioRef: this.audioElement,
                 enableConsoleLogs: true,
-                iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-                rtcConfig: {
-                    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-                }
+                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
             };
 
             appendToLog('SYSTEM', "Initializing Simli Client...");
-
-            // Instantiate with config here
-            try {
-                this.simliClient = new SimliClient(simliConfig);
-            } catch (ctorErr) {
-                 console.warn("Constructor with config failed, trying without...", ctorErr);
-                 this.simliClient = new SimliClient();
-            }
-
             this.simliClient.Initialize(simliConfig);
 
             this.simliClient.on("connected", () => {
@@ -188,21 +176,10 @@ class SimliAvatar {
         
         // Передаем iceServers именно сюда, в метод start
         const config = {
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-            rtcConfig: {
-                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-            }
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
         };
         
-        console.log("Simli Start Config:", config);
-
-        try {
-            this.simliClient.start(config);
-        } catch (e) {
-            console.warn("Simli Start with config failed, retrying without config...", e);
-            appendToLog('SYSTEM', "Retry Simli Start (fallback)...");
-            this.simliClient.start();
-        }
+        this.simliClient.start(config);
     }
 
     speak(audioData) {
