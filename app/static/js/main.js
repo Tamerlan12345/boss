@@ -1,4 +1,4 @@
-import { SimliClient } from 'https://esm.sh/simli-client@1.2.0';
+import { SimliClient } from 'https://esm.sh/simli-client@1.2.20';
 
 let audioContext;
 let ws;
@@ -141,7 +141,10 @@ class SimliAvatar {
                 videoRef: this.videoElement,
                 audioRef: this.audioElement,
                 enableConsoleLogs: true,
-                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+                iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+                rtcConfig: {
+                    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+                }
             };
 
             appendToLog('SYSTEM', "Initializing Simli Client...");
@@ -176,7 +179,24 @@ class SimliAvatar {
 
     start() {
         appendToLog('SYSTEM', "Starting Simli Session...");
-        this.simliClient.start();
+        
+        // Передаем iceServers именно сюда, в метод start
+        const config = {
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+            rtcConfig: {
+                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+            }
+        };
+        
+        console.log("Simli Start Config:", config);
+
+        try {
+            this.simliClient.start(config);
+        } catch (e) {
+            console.warn("Simli Start with config failed, retrying without config...", e);
+            appendToLog('SYSTEM', "Retry Simli Start (fallback)...");
+            this.simliClient.start();
+        }
     }
 
     speak(audioData) {
@@ -203,7 +223,6 @@ connectBtn.onclick = async () => {
         // 1. Start Simli Avatar
         avatar = new SimliAvatar(videoElement, audioElement);
         await avatar.initialize();
-        await new Promise(r => setTimeout(r, 250));
         avatar.start();
 
         // 2. Initialize AudioContext for Microphone Input and Visualizer
