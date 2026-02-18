@@ -1,37 +1,29 @@
-import pytest
 import asyncio
 
 # Logic to be tested (extracted/simulated from app/main.py)
 async def process_audio_stream(mode, state, gemini_stream):
     """
     Simulates the audio processing loop in app/main.py send_to_client
+    (Updated to match new non-blocking logic for commands)
     """
     output_audio = []
     output_logs = []
-
-    # NEW: Summary buffer
-    summary_audio_buffer = bytearray()
 
     is_silenced = False
 
     # Simulate the loop
     async for chunk in gemini_stream:
         if isinstance(chunk, bytes):
-            # FIX: Reset silence on new audio
             is_silenced = False
-
-            # --- Logic from app/main.py ---
-            should_buffer = False
             should_send = True
 
             if mode == "speaker":
-                if not state.get("speaker_active", False):
-                    if state.get("processing_summary", False):
-                        should_buffer = True
-                        should_send = False
-                    else:
-                        # Discard
-                        should_send = False
+                # Strict blocking unless active OR command executing
+                # Note: Logic must match app/main.py exactly
+                if not state.get("speaker_active", False) and \
+                   not state.get("intro_active", False) and \
+                   not state.get("processing_summary", False):
+                    should_send = False
 
             elif mode == "panel":
                 if not state.get("speaking_enabled", True):
@@ -40,33 +32,18 @@ async def process_audio_stream(mode, state, gemini_stream):
             if is_silenced:
                 should_send = False
 
-            # Assume resampling is mocked (just use chunk directly)
-            resampled_audio = chunk
-
-            if should_buffer:
-                summary_audio_buffer.extend(resampled_audio)
-                continue
-
             if should_send:
-                output_audio.append(resampled_audio)
-            # -----------------------------
+                output_audio.append(chunk)
 
         elif isinstance(chunk, str):
             if "[SILENCE]" in chunk:
                 is_silenced = True
 
-                # --- Logic from app/main.py ---
                 if mode == "speaker":
-                    # Mark summary generation as done
                     if state.get("processing_summary"):
                         state["processing_summary"] = False
-
-                    # If Active + Summary Buffer -> Play it
-                    # Note: We play buffer even if silenced is True (because we are silencing *incoming* stream)
-                    if state.get("speaker_active") and len(summary_audio_buffer) > 0:
-                        output_audio.append(bytes(summary_audio_buffer))
-                        summary_audio_buffer.clear()
-                # -----------------------------
+                    if state.get("intro_active"):
+                        state["intro_active"] = False
 
             else:
                 if chunk.strip():
@@ -77,79 +54,71 @@ async def process_audio_stream(mode, state, gemini_stream):
 
 def test_speaker_passive_mode_silence():
     async def run():
-        # Setup
         mode = "speaker"
-        state = {"speaker_active": False, "processing_summary": False}
-
-        # Mock stream: Audio chunks
+        state = {"speaker_active": False, "processing_summary": False, "intro_active": False}
         async def mock_stream():
             yield b'audio_chunk_1'
-            yield b'audio_chunk_2'
+            yield "[SILENCE]"
 
-        audio, logs = await process_audio_stream(mode, state, mock_stream())
-
-        # Expectation: No audio passed through because speaker is inactive and not summarizing
-        assert len(audio) == 0
+        audio, _ = await process_audio_stream(mode, state, mock_stream())
+        assert len(audio) == 0, f"Expected 0 audio chunks, got {len(audio)}"
+        print("PASS: test_speaker_passive_mode_silence")
     asyncio.run(run())
 
 def test_speaker_active_mode_audio():
     async def run():
-        # Setup
         mode = "speaker"
-        state = {"speaker_active": True, "processing_summary": False}
-
+        state = {"speaker_active": True, "processing_summary": False, "intro_active": False}
         async def mock_stream():
             yield b'audio_chunk_1'
+            yield "[SILENCE]"
 
-        audio, logs = await process_audio_stream(mode, state, mock_stream())
-
-        # Expectation: Audio passed through
-        assert len(audio) == 1
-        assert audio[0] == b'audio_chunk_1'
+        audio, _ = await process_audio_stream(mode, state, mock_stream())
+        assert len(audio) == 1, f"Expected 1 audio chunk, got {len(audio)}"
+        print("PASS: test_speaker_active_mode_audio")
     asyncio.run(run())
 
-def test_summary_buffer_playback_after_active_intro():
+def test_speaker_passive_intro_command():
     async def run():
-        # Setup
         mode = "speaker"
-        # Start in Passive, Generating Summary
-        state = {"speaker_active": False, "processing_summary": True}
-
+        # Passive but Intro command active
+        state = {"speaker_active": False, "processing_summary": False, "intro_active": True}
         async def mock_stream():
-            # 1. Summary Audio (Passive)
-            yield b'summary_part1'
-            yield b'summary_part2'
-            yield "[SILENCE]" # End of summary generation
-
-            # Simulate User clicking "Active" externally
-            # In real code, this happens via receive loop modifying shared state
-            state["speaker_active"] = True
-
-            # 2. Intro Audio (Active) -> Triggered by [CMD: INTRODUCE]
             yield b'intro_audio'
-            yield "[SILENCE]" # End of Intro
+            yield "[SILENCE]"
+            yield b'ignored_audio' # Should be ignored after silence resets intro_active
+            yield "[SILENCE]"
 
-            # 3. Normal conversation
-            yield b'response_audio'
+        audio, _ = await process_audio_stream(mode, state, mock_stream())
 
-        audio, logs = await process_audio_stream(mode, state, mock_stream())
-
-        # Expectation:
-        # 1. Summary parts NOT emitted directly (buffered).
-        # 2. Intro emitted directly (because active=True).
-        # 3. Summary buffer emitted AFTER Intro [SILENCE].
-        # 4. Response emitted directly.
-
-        # Expected sequence:
-        # - b'intro_audio' (from step 2, sent immediately)
-        # - b'summary_part1summary_part2' (from step 2 [SILENCE], buffer playback)
-        # - b'response_audio' (from step 3)
-
-        assert len(audio) == 3
+        # Expect intro audio to pass, but subsequent audio to be blocked
+        assert len(audio) == 1, f"Expected 1 audio chunk (intro), got {len(audio)}"
         assert audio[0] == b'intro_audio'
-        assert audio[1] == b'summary_part1summary_part2'
-        assert audio[2] == b'response_audio'
-
-        # Verify state reset
-        assert state["processing_summary"] is False
+        assert state["intro_active"] == False, "intro_active should be reset"
+        print("PASS: test_speaker_passive_intro_command")
     asyncio.run(run())
+
+def test_speaker_passive_summary_command():
+    async def run():
+        mode = "speaker"
+        # Passive but Summary command active
+        state = {"speaker_active": False, "processing_summary": True, "intro_active": False}
+        async def mock_stream():
+            yield b'summary_audio'
+            yield "[SILENCE]"
+            yield b'ignored_audio'
+            yield "[SILENCE]"
+
+        audio, _ = await process_audio_stream(mode, state, mock_stream())
+
+        assert len(audio) == 1, f"Expected 1 audio chunk, got {len(audio)}"
+        assert audio[0] == b'summary_audio'
+        assert state["processing_summary"] == False, "processing_summary should be reset"
+        print("PASS: test_speaker_passive_summary_command")
+    asyncio.run(run())
+
+if __name__ == "__main__":
+    test_speaker_passive_mode_silence()
+    test_speaker_active_mode_audio()
+    test_speaker_passive_intro_command()
+    test_speaker_passive_summary_command()
