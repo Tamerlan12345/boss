@@ -168,6 +168,10 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                             # Обработка JSON команд от клиента
                             try:
                                 msg_data = json.loads(message["text"])
+
+                                if not isinstance(msg_data, dict):
+                                    continue
+
                                 if msg_data.get("type") == "mute_toggle":
                                     state["speaking_enabled"] = msg_data.get("enabled", True)
                                     logger.info(f"Mute toggle: speaking_enabled={state['speaking_enabled']}")
