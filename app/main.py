@@ -150,73 +150,76 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                         logger.info("Client disconnected (Event)")
                         break
                     
-                    if message["type"] == "websocket.receive":
-                        if "bytes" in message and message["bytes"]:
-                            data = message["bytes"]
+                    try:
+                        if message["type"] == "websocket.receive":
+                            if "bytes" in message and message["bytes"]:
+                                data = message["bytes"]
+
+                                # Обработка спикера
+                                speaker = await loop.run_in_executor(None, identifier.process_chunk, data)
+                                if speaker and speaker != current_speaker:
+                                    current_speaker = speaker
+                                    logger.info(f"Speaker changed to: {speaker}")
+                                    await gemini_client.send_text(f"[User Changed: {speaker}]")
+
+                                # Отправка аудио в Gemini (Context Preservation: Always send audio regardless of Mute state - Verified)
+                                await gemini_client.send_audio(data)
                             
-                            # Обработка спикера
-                            speaker = await loop.run_in_executor(None, identifier.process_chunk, data)
-                            if speaker and speaker != current_speaker:
-                                current_speaker = speaker
-                                logger.info(f"Speaker changed to: {speaker}")
-                                await gemini_client.send_text(f"[User Changed: {speaker}]")
-                            
-                            # Отправка аудио в Gemini (Context Preservation: Always send audio regardless of Mute state - Verified)
-                            await gemini_client.send_audio(data)
-                        
-                        elif "text" in message:
-                            # Обработка JSON команд от клиента
-                            try:
-                                msg_data = json.loads(message["text"])
+                            elif "text" in message:
+                                # Обработка JSON команд от клиента
+                                try:
+                                    msg_data = json.loads(message["text"])
 
-                                if not isinstance(msg_data, dict):
-                                    continue
+                                    if not isinstance(msg_data, dict):
+                                        continue
 
-                                if msg_data.get("type") == "mute_toggle":
-                                    state["speaking_enabled"] = msg_data.get("enabled", True)
-                                    logger.info(f"Mute toggle: speaking_enabled={state['speaking_enabled']}")
+                                    if msg_data.get("type") == "mute_toggle":
+                                        state["speaking_enabled"] = msg_data.get("enabled", True)
+                                        logger.info(f"Mute toggle: speaking_enabled={state['speaking_enabled']}")
 
-                                elif msg_data.get("type") == "toggle_active":
-                                    if mode == "speaker":
-                                        enabled = msg_data.get("enabled", False)
-                                        state["speaker_active"] = enabled
+                                    elif msg_data.get("type") == "toggle_active":
+                                        if mode == "speaker":
+                                            enabled = msg_data.get("enabled", False)
+                                            state["speaker_active"] = enabled
 
-                                        if not enabled:
-                                            await gemini_client.send_text(
-                                                "URGENT COMMAND: ENTER PASSIVE MODE. DO NOT SPEAK. Output [SILENCE] until further notice."
-                                            )
+                                            if not enabled:
+                                                await gemini_client.send_text(
+                                                    "URGENT COMMAND: ENTER PASSIVE MODE. DO NOT SPEAK. Output [SILENCE] until further notice."
+                                                )
+                                            else:
+                                                # If enabling active mode, flush buffer if any
+                                                if len(summary_buffer) > 0:
+                                                    logger.info(f"Flushing summary buffer: {len(summary_buffer)} bytes")
+                                                    await websocket.send_bytes(bytes(summary_buffer))
+                                                    summary_buffer.clear()
+
+                                    elif msg_data.get("type") == "trigger_introduce":
+                                        if mode == "speaker":
+                                            state["intro_active"] = True
+                                            await gemini_client.send_text("[CMD: INTRODUCE]")
+
+                                    elif msg_data.get("type") == "trigger_summary":
+                                        logger.info("Triggering summary generation...")
+                                        if mode == "speaker":
+                                            state["processing_summary"] = True
+                                            await gemini_client.send_text("[CMD: SUMMARIZE] Generate summary now. Output [SILENCE] when finished.")
                                         else:
-                                            # If enabling active mode, flush buffer if any
-                                            if len(summary_buffer) > 0:
-                                                logger.info(f"Flushing summary buffer: {len(summary_buffer)} bytes")
-                                                await websocket.send_bytes(bytes(summary_buffer))
-                                                summary_buffer.clear()
-
-                                elif msg_data.get("type") == "trigger_introduce":
-                                    if mode == "speaker":
-                                        state["intro_active"] = True
-                                        await gemini_client.send_text("[CMD: INTRODUCE]")
-
-                                elif msg_data.get("type") == "trigger_summary":
-                                    logger.info("Triggering summary generation...")
-                                    if mode == "speaker":
-                                        state["processing_summary"] = True
-                                        await gemini_client.send_text("[CMD: SUMMARIZE] Generate summary now. Output [SILENCE] when finished.")
-                                    else:
-                                        prompt = (
-                                            "Проанализируй всё услышанное обсуждение. "
-                                            "Сделай структурированную выжимку (summary) длительностью от 80 до 180 секунд (2-3 минуты). "
-                                            "Выдели ключевые тезисы, аргументы и выводы. "
-                                            "После этого ответа переходи в режим ожидания: отвечай только если услышишь обращение 'Dos' или 'Дос'."
-                                        )
-                                        await gemini_client.send_text(prompt)
-                            except json.JSONDecodeError:
-                                pass
+                                            prompt = (
+                                                "Проанализируй всё услышанное обсуждение. "
+                                                "Сделай структурированную выжимку (summary) длительностью от 80 до 180 секунд (2-3 минуты). "
+                                                "Выдели ключевые тезисы, аргументы и выводы. "
+                                                "После этого ответа переходи в режим ожидания: отвечай только если услышишь обращение 'Dos' или 'Дос'."
+                                            )
+                                            await gemini_client.send_text(prompt)
+                                except json.JSONDecodeError:
+                                    pass
+                    except Exception as e:
+                        logger.error(f"Error processing message: {e}")
 
             except WebSocketDisconnect:
                 logger.info("Client disconnected (Exception)")
             except Exception as e:
-                logger.error(f"Error receiving from client: {e}")
+                logger.error(f"Critical error receiving from client: {e}")
 
         async def send_to_client():
             """Отправляет ответы клиенту."""
