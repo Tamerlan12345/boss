@@ -4,7 +4,6 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 import logging
 import os
 import glob
-import soundfile as sf
 
 logger = logging.getLogger(__name__)
 
