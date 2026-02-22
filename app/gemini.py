@@ -1,6 +1,5 @@
 import websockets
 import json
-import asyncio
 import os
 import base64
 import logging
