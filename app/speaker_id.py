@@ -2,7 +2,6 @@ import numpy as np
 from collections import deque
 from resemblyzer import VoiceEncoder, preprocess_wav
 import logging
-import io
 import os
 import glob
 import soundfile as sf
