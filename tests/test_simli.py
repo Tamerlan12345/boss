@@ -1,7 +1,6 @@
 import unittest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch
 import os
-import asyncio
 
 # Set env vars before import
 os.environ["SIMLI_API_KEY"] = "test_simli_key"
