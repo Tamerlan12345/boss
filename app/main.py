@@ -137,11 +137,14 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                 data = message["bytes"]
 
                                 # Обработка спикера
-                                speaker = await loop.run_in_executor(None, identifier.process_chunk, data)
-                                if speaker and speaker != current_speaker:
-                                    current_speaker = speaker
-                                    logger.info(f"Speaker changed to: {speaker}")
-                                    await gemini_client.send_text(f"[User Changed: {speaker}]")
+                                # Optimize: Avoid run_in_executor for simple buffering (96% of calls)
+                                segment = identifier.consume_audio(data)
+                                if segment is not None:
+                                    speaker = await loop.run_in_executor(None, identifier.identify_speaker, segment)
+                                    if speaker and speaker != current_speaker:
+                                        current_speaker = speaker
+                                        logger.info(f"Speaker changed to: {speaker}")
+                                        await gemini_client.send_text(f"[User Changed: {speaker}]")
 
                                 # Отправка аудио в Gemini (Context Preservation: Always send audio regardless of Mute state - Verified)
                                 await gemini_client.send_audio(data)
