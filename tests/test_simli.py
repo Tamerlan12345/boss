@@ -3,10 +3,6 @@ from unittest.mock import patch, MagicMock
 import os
 import sys
 
-# Set env vars before import
-os.environ["SIMLI_API_KEY"] = "test_simli_key"
-os.environ["SIMLI_FACE_ID"] = "test_face_id"
-
 from fastapi.testclient import TestClient
 
 class TestSimli(unittest.TestCase):
@@ -42,11 +38,23 @@ class TestSimli(unittest.TestCase):
         self.modules_patcher.stop()
 
     def test_config_endpoint(self):
-        response = self.client.get("/simli/config")
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(data["apiKey"], "test_simli_key")
-        self.assertEqual(data["faceID"], "test_face_id")
+        with patch.dict(os.environ, {"SIMLI_API_KEY": "test_simli_key", "SIMLI_FACE_ID": "test_face_id"}):
+            response = self.client.get("/simli/config")
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertEqual(data["apiKey"], "test_simli_key")
+            self.assertEqual(data["faceID"], "test_face_id")
+
+    def test_config_endpoint_missing(self):
+        with patch.dict(os.environ):
+            if "SIMLI_API_KEY" in os.environ: del os.environ["SIMLI_API_KEY"]
+            if "SIMLI_FACE_ID" in os.environ: del os.environ["SIMLI_FACE_ID"]
+
+            response = self.client.get("/simli/config")
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertIsNone(data["apiKey"])
+            self.assertIsNone(data["faceID"])
 
 if __name__ == '__main__':
     unittest.main()
