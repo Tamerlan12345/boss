@@ -8,7 +8,6 @@ import uvicorn
 import os
 import asyncio
 import logging
-import re
 import json
 from dotenv import load_dotenv
 import numpy as np
