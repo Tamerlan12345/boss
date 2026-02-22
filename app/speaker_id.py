@@ -1,4 +1,5 @@
 import numpy as np
+from collections import deque
 from resemblyzer import VoiceEncoder, preprocess_wav
 import logging
 import io
@@ -15,7 +16,8 @@ class SpeakerIdentifier:
         self.speaker_embeddings = np.zeros((0, 256), dtype=np.float32)
         self._update_matrix()
 
-        self.buffer = np.array([], dtype=np.float32)
+        self.buffer = deque()
+        self.buffer_sample_count = 0
         self.sample_rate = 16000
         self.window_size = 1.5 # Window size for embedding extraction
         self.step_size = 0.5   # Stride
@@ -94,6 +96,11 @@ class SpeakerIdentifier:
         else:
             self.speaker_embeddings = np.zeros((0, 256), dtype=np.float32)
 
+    def reset_buffer(self):
+        self.buffer.clear()
+        self.buffer_sample_count = 0
+        self.samples_processed = 0
+
     def process_chunk(self, chunk_bytes: bytes) -> str:
         """
         Processes a chunk of PCM 16-bit 16kHz audio.
@@ -110,22 +117,42 @@ class SpeakerIdentifier:
         int16_data = np.frombuffer(chunk_bytes, dtype=np.int16)
         float32_data = int16_data.astype(np.float32) / 32768.0
 
-        self.buffer = np.concatenate((self.buffer, float32_data))
+        chunk_len = len(float32_data)
+        self.buffer.append(float32_data)
+        self.buffer_sample_count += chunk_len
 
         # Keep buffer manageable (e.g. max 5 seconds)
-        if len(self.buffer) > 5 * self.sample_rate:
-             self.buffer = self.buffer[-5*self.sample_rate:]
+        max_samples = 5 * self.sample_rate
+        while self.buffer_sample_count > max_samples:
+             popped = self.buffer.popleft()
+             self.buffer_sample_count -= len(popped)
 
         # Run identification if we have enough data since last check
         # Ideally we want a sliding window.
 
         required_samples = int(self.window_size * self.sample_rate)
-        chunk_samples = len(float32_data)
-        self.samples_processed += chunk_samples
+        self.samples_processed += chunk_len
 
-        if len(self.buffer) >= required_samples and self.samples_processed >= self.check_interval:
-            # Take the last window
-            segment = self.buffer[-required_samples:]
+        if self.buffer_sample_count >= required_samples and self.samples_processed >= self.check_interval:
+            # Reconstruct the last window_size samples
+            # Collect chunks from right to left until we have enough
+            segment_chunks = []
+            collected_samples = 0
+            # Iterate reversed over the deque
+            for chunk in reversed(self.buffer):
+                segment_chunks.append(chunk)
+                collected_samples += len(chunk)
+                if collected_samples >= required_samples:
+                    break
+
+            # Since we collected from right to left, we need to reverse the list of chunks
+            segment_chunks.reverse()
+
+            # Concatenate
+            full_segment = np.concatenate(segment_chunks)
+
+            # Take the exact last required_samples
+            segment = full_segment[-required_samples:]
 
             # We optimize by not running every single chunk, maybe every 0.5s worth of chunks?
             # Now we implement the optimization using check_interval (stride)

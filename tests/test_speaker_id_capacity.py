@@ -76,7 +76,7 @@ class TestSpeakerIdentifier(unittest.TestCase):
             # To avoid buffer pollution from previous iterations in this test loop,
             # we can create a fresh identifier or reset buffer.
             # But let's just clear buffer manually for the test
-            identifier.buffer = np.array([], dtype=np.float32)
+            identifier.reset_buffer()
 
             identified_name = identifier.process_chunk(chunk_bytes)
 
@@ -96,7 +96,7 @@ class TestSpeakerIdentifier(unittest.TestCase):
         int16_data = (float_data * 32768).astype(np.int16)
         chunk_bytes = int16_data.tobytes()
 
-        identifier.buffer = np.array([], dtype=np.float32)
+        identifier.reset_buffer()
         identified_name = identifier.process_chunk(chunk_bytes)
 
         # Should be None if similarity is low.
