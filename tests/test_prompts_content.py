@@ -1,6 +1,6 @@
 def test_prompts_contain_strict_rules():
-    """Verifies that app/main.py contains the required strict prompt instructions."""
-    with open("app/main.py", "r", encoding="utf-8") as f:
+    """Verifies that app/prompts.py contains the required strict prompt instructions."""
+    with open("app/prompts.py", "r", encoding="utf-8") as f:
         content = f.read()
 
     # Define the strict rules we expect

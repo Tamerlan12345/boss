@@ -18,6 +18,18 @@ import torchaudio
 from app.gemini import GeminiClient
 from app.speaker_id import SpeakerIdentifier
 from resemblyzer import VoiceEncoder
+from app.prompts import (
+    SPEAKER_MODE_INSTRUCTION,
+    PANEL_MODE_INSTRUCTION,
+    DEFAULT_INSTRUCTION,
+    PASSIVE_MODE_COMMAND,
+    INTRODUCE_COMMAND,
+    SUMMARIZE_COMMAND_SPEAKER,
+    SUMMARIZE_PROMPT_PANEL,
+    SIMLI_WARMUP_SPEAKER,
+    SIMLI_WARMUP_PANEL,
+    SIMLI_WARMUP_DEFAULT,
+)
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -100,35 +112,11 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
 
         # System Instructions
         if mode == "speaker":
-            system_instruction = (
-                "Режим «Speaker» (Аналитик и наблюдатель)\n"
-                "Этот режим предназначен для анализа выводов, где ИИ выступает в роли пассивного слушателя.\n\n"
-                "Режим: ПАССИВНЫЙ / АКТИВНЫЙ:\n"
-                "Основной переключатель поведения.\n"
-                "Пассивный (по умолчанию): ИИ просто слушает обсуждение, фиксирует, кто и что говорит, анализирует контекст, но сам не вступает в разговор.\n"
-                "Активный: ИИ готов отвечать на вопросы, ТОЛЬКО если услышит обращение к себе по имени «Dos» или «Дос». В остальных случаях слушай и выводи [SILENCE].\n\n"
-                "КОМАНДЫ:\n"
-                "1. Представиться ([CMD: INTRODUCE]): ИИ выйдет в эфир и коротко расскажет о своей роли.\n"
-                "2. GENERATE SUMMARY ([CMD: SUMMARIZE]): Инструмент аналитики. После завершения обсуждения ИИ подготовит и выдаст структурированное голосовое резюме (саммари) всей сессии с основными тезисами.\n"
-                "3. TERMINATE: Завершение сессии и отключение связи.\n\n"
-                "ВАЖНО: Выводи [SILENCE], если нет прямого обращения \"Dos\" или команды в активном режиме."
-            )
+            system_instruction = SPEAKER_MODE_INSTRUCTION
         elif mode == "panel":
-            system_instruction = (
-                "Режим «Panel» (Участник дискуссии)\n"
-                "Этот режим подходит для активного участия ИИ в обсуждении в качестве одного из спикеров.\n\n"
-                "Участие в диалоге:\n"
-                "В этом режиме ИИ настроен как полноценный участник панели. Он слушает контекст.\n"
-                "ВАЖНО: Находясь в активном режиме, отвечай голосом ТОЛЬКО тогда, когда к тебе обращаются по имени «Dos» или «Дос». В остальных случаях слушай и выводи [SILENCE].\n"
-                "Даже если ты молчишь, сохраняй контекст услышанного.\n\n"
-                "Кнопка Mute (DOS: ACTIVE/MUTED):\n"
-                "Позволяет временно «выключить» голос ИИ, если нужно, чтобы он продолжал слушать и анализировать, но гарантированно не перебивал участников.\n\n"
-                "Автономность:\n"
-                "Если нет прямого обращения, выводи [SILENCE].\n"
-                "Будь собранным и осторожным в высказываниях."
-            )
+            system_instruction = PANEL_MODE_INSTRUCTION
         else:
-            system_instruction = "Ты — Dos (Дос), ИИ-аналитик и ассистент."
+            system_instruction = DEFAULT_INSTRUCTION
         
         await gemini_client.connect(system_instruction=system_instruction)
 
@@ -177,9 +165,7 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                             state["speaker_active"] = enabled
 
                                             if not enabled:
-                                                await gemini_client.send_text(
-                                                    "URGENT COMMAND: ENTER PASSIVE MODE. DO NOT SPEAK. Output [SILENCE] until further notice."
-                                                )
+                                                await gemini_client.send_text(PASSIVE_MODE_COMMAND)
                                             else:
                                                 # If enabling active mode, flush buffer if any
                                                 if len(summary_buffer) > 0:
@@ -190,21 +176,15 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                     elif msg_data.get("type") == "trigger_introduce":
                                         if mode == "speaker":
                                             state["intro_active"] = True
-                                            await gemini_client.send_text("[CMD: INTRODUCE]")
+                                            await gemini_client.send_text(INTRODUCE_COMMAND)
 
                                     elif msg_data.get("type") == "trigger_summary":
                                         logger.info("Triggering summary generation...")
                                         if mode == "speaker":
                                             state["processing_summary"] = True
-                                            await gemini_client.send_text("[CMD: SUMMARIZE] Generate summary now. Output [SILENCE] when finished.")
+                                            await gemini_client.send_text(SUMMARIZE_COMMAND_SPEAKER)
                                         else:
-                                            prompt = (
-                                                "Проанализируй всё услышанное обсуждение. "
-                                                "Сделай структурированную выжимку (summary) длительностью от 80 до 180 секунд (2-3 минуты). "
-                                                "Выдели ключевые тезисы, аргументы и выводы. "
-                                                "После этого ответа переходи в режим ожидания: отвечай только если услышишь обращение 'Dos' или 'Дос'."
-                                            )
-                                            await gemini_client.send_text(prompt)
+                                            await gemini_client.send_text(SUMMARIZE_PROMPT_PANEL)
                                 except json.JSONDecodeError:
                                     pass
                     except Exception as e:
@@ -228,18 +208,11 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
 
             # Приветствие (зависит от режима)
             if mode == "speaker":
-                 await gemini_client.send_text(
-                    'System Initialized. Enter MODE A: [PASSIVE_LISTENING]. Output [SILENCE].'
-                )
+                 await gemini_client.send_text(SIMLI_WARMUP_SPEAKER)
             elif mode == "panel":
-                 await gemini_client.send_text(
-                    'Generate audio immediately. Say: "Я ИИ спикер Dos. Я готов участвовать в дискуссии."'
-                )
+                 await gemini_client.send_text(SIMLI_WARMUP_PANEL)
             else:
-                await gemini_client.send_text(
-                    'Generate audio immediately. Say exactly this phrase with energy: '
-                    '"Я ИИ спикер Dos. Сегодня я буду вместе с вами разбирать и участвовать в теме обсуждения, которую вы зададите."'
-                )
+                await gemini_client.send_text(SIMLI_WARMUP_DEFAULT)
 
             try:
                 # Стандартный цикл чтения (без прерываний)
