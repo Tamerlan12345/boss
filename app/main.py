@@ -48,16 +48,10 @@ async def startup_event():
         logger.error(f"Failed to load ML models: {e}")
 
 @app.get("/")
-async def get(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
 @app.get("/panel")
-async def get_panel(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
 @app.get("/speaker")
-async def get_speaker(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def get_index(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html")
 
 @app.get("/simli/config")
 def get_simli_config():
