@@ -67,6 +67,10 @@ class SpeakerIdentifier:
         if not self.encoder or not self.speakers:
             return None
 
+        # Validate chunk length for int16 (must be even)
+        if len(chunk_bytes) % 2 != 0:
+            return None
+
         # Convert bytes to float32
         int16_data = np.frombuffer(chunk_bytes, dtype=np.int16)
         float32_data = int16_data.astype(np.float32) / 32768.0
