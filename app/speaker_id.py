@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 class SpeakerIdentifier:
     def __init__(self, encoder=None, speakers=None):
         self.speakers = speakers.copy() if speakers else {} # name -> embedding
+        self.speaker_names = []
+        self.speaker_embeddings = np.zeros((0, 256), dtype=np.float32)
+        self._update_matrix()
+
         self.buffer = np.array([], dtype=np.float32)
         self.sample_rate = 16000
         self.window_size = 1.5 # Window size for embedding extraction
@@ -54,10 +58,41 @@ class SpeakerIdentifier:
                 return
 
             embedding = self.encoder.embed_utterance(wav)
+
+            # Normalize before adding
+            norm = np.linalg.norm(embedding)
+            if norm > 1e-6:
+                embedding = embedding / norm
+
             self.speakers[name] = embedding
+            self._update_matrix()
             logger.info(f"Registered speaker: {name}")
         except Exception as e:
             logger.error(f"Error registering speaker {name}: {e}")
+
+    def _update_matrix(self):
+        """
+        Updates the internal matrix of speaker embeddings for vectorized operations.
+        Ensures all embeddings in self.speakers are normalized.
+        """
+        self.speaker_names = []
+        embeddings_list = []
+
+        # Iterate over items. Note: we modify self.speakers values in place if needed.
+        for name, emb in self.speakers.items():
+            # Normalize embedding if not already normalized
+            norm = np.linalg.norm(emb)
+            if norm > 1e-6 and abs(norm - 1.0) > 1e-5:
+                emb = emb / norm
+                self.speakers[name] = emb
+
+            self.speaker_names.append(name)
+            embeddings_list.append(emb)
+
+        if embeddings_list:
+            self.speaker_embeddings = np.array(embeddings_list, dtype=np.float32)
+        else:
+            self.speaker_embeddings = np.zeros((0, 256), dtype=np.float32)
 
     def process_chunk(self, chunk_bytes: bytes) -> str:
         """
@@ -98,17 +133,24 @@ class SpeakerIdentifier:
 
             embedding = self.encoder.embed_utterance(segment)
 
-            best_name = None
-            max_similarity = 0
+            # Normalize input embedding
+            norm = np.linalg.norm(embedding)
+            if norm < 1e-6:
+                return None
+            embedding = embedding / norm
 
-            for name, spk_emb in self.speakers.items():
-                # Cosine similarity
-                similarity = np.dot(embedding, spk_emb) / (np.linalg.norm(embedding) * np.linalg.norm(spk_emb))
-                if similarity > max_similarity:
-                    max_similarity = similarity
-                    best_name = name
+            if len(self.speaker_embeddings) == 0:
+                return None
+
+            # Vectorized cosine similarity
+            # self.speaker_embeddings is (N, D), embedding is (D,)
+            # Result is (N,)
+            similarities = np.dot(self.speaker_embeddings, embedding)
+
+            best_idx = np.argmax(similarities)
+            max_similarity = similarities[best_idx]
 
             if max_similarity > 0.65: # Threshold (tuned experimentally)
-                return best_name
+                return self.speaker_names[best_idx]
 
         return None

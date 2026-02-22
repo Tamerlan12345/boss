@@ -34,6 +34,7 @@ class TestSpeakerIdentifierSecurity(unittest.TestCase):
 
         # We need to register a speaker so it doesn't return early due to empty speakers
         identifier.speakers = {'test': np.zeros(256)}
+        identifier._update_matrix()
 
         # Create an odd-length chunk (3 bytes)
         odd_chunk = b'\x00\x00\x00'
