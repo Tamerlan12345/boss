@@ -39,7 +39,7 @@
 
         <div class="control-panel">
             <label>Текущий Черновик (Мысли ИИ):</label>
-            <textarea id="draft-text" readonly></textarea>
+            <textarea id="draft-text" readonly style="background: #222; color: #888; cursor: not-allowed;"></textarea>
             <div style="display: flex; gap: 5px;">
                 <button class="approve" id="approve-btn" onclick="approveDraft()" disabled>Одобрить (Пустить в эфир)</button>
                 <button class="reject" id="reject-btn" onclick="rejectDraft()" disabled>Отклонить (Запретить говорить)</button>
@@ -65,6 +65,12 @@
             <label>Управление Разговором:</label>
             <button onclick="toggleAI(true)" class="approve">Включить разговор (Активный)</button>
             <button onclick="toggleAI(false)" class="reject">Отключить разговор (Пассивный)</button>
+
+            <hr style="border-color: #333; width: 100%;">
+
+            <label>Управление Саммари:</label>
+            <textarea id="summary-text" placeholder="Вставьте текст для саммари..."></textarea>
+            <button onclick="summaryFromText()">Сделать саммари по тексту</button>
             <button onclick="triggerAdminSummary()">Сделать Саммари текущей сессии</button>
 
             <hr style="border-color: #333; width: 100%;">
@@ -182,6 +188,14 @@
 
         function triggerAdminSummary() {
             if (ws) ws.send(JSON.stringify({type: 'trigger_summary'}));
+        }
+
+        function summaryFromText() {
+            const text = document.getElementById('summary-text').value;
+            if (ws && text) {
+                ws.send(JSON.stringify({type: 'summary_from_text', text: text}));
+                document.getElementById('summary-text').value = '';
+            }
         }
 
         connect();
