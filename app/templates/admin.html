@@ -62,6 +62,13 @@
     <div class="column">
         <h2>Экстренные Действия</h2>
         <div class="control-panel">
+            <label>Управление Разговором:</label>
+            <button onclick="toggleAI(true)" class="approve">Включить разговор (Активный)</button>
+            <button onclick="toggleAI(false)" class="reject">Отключить разговор (Пассивный)</button>
+            <button onclick="triggerAdminSummary()">Сделать Саммари текущей сессии</button>
+
+            <hr style="border-color: #333; width: 100%;">
+
             <button onclick="triggerFiller()">Включить заглушку (Думаю...)</button>
             <button onclick="compressContext()">Сжать контекст памяти</button>
             <button onclick="recoverSession()" style="background: #a50;">Восстановить соединение</button>
@@ -167,6 +174,14 @@
 
         function recoverSession() {
             if (ws) ws.send(JSON.stringify({type: 'recover'}));
+        }
+
+        function toggleAI(enabled) {
+            if (ws) ws.send(JSON.stringify({type: 'toggle_state', enabled: enabled}));
+        }
+
+        function triggerAdminSummary() {
+            if (ws) ws.send(JSON.stringify({type: 'trigger_summary'}));
         }
 
         connect();

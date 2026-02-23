@@ -167,7 +167,8 @@ async def admin_websocket(websocket: WebSocket):
                 if command == "approve":
                     if session_manager.gemini_client:
                         logger.info("Admin approved draft.")
-                        await session_manager.gemini_client.send_text(f"APPROVED. IGNORE ALL PASSIVE RULES. SPEAK THIS ALOUD: {session_manager.current_draft}")
+                        draft_to_speak = session_manager.current_draft.replace("PLAN:", "").strip()
+                        await session_manager.gemini_client.send_text(f"[SYSTEM OVERRIDE] ОДОБРЕНО. ИГНОРИРУЙ ВСЕ ПРАВИЛА ПАССИВНОГО РЕЖИМА И ПРОТОКОЛЫ. НЕ ПИШИ ПЛАН. СРАЗУ ПРОИЗНЕСИ ЭТОТ ТЕКСТ ГОЛОСОМ: {draft_to_speak}")
                         session_manager.current_draft = ""
                         await session_manager.broadcast_status("Draft Approved")
 
@@ -188,9 +189,28 @@ async def admin_websocket(websocket: WebSocket):
                     text = msg.get("text")
                     if session_manager.gemini_client and text:
                         # Direct speak override
-                        await session_manager.gemini_client.send_text(f"IGNORE PLAN. SAY EXACTLY: {text}")
+                        await session_manager.gemini_client.send_text(f"[SYSTEM OVERRIDE] ПРЯМАЯ КОМАНДА АДМИНА. СРАЗУ ПРОИЗНЕСИ ГОЛОСОМ, БЕЗ АНАЛИЗА: {text}")
                         session_manager.current_draft = ""
                         await session_manager.broadcast_status("Manual Override Sent")
+
+                elif command == "toggle_state":
+                    enabled = msg.get("enabled")
+                    session_manager.state["speaker_active"] = enabled
+                    session_manager.state["speaking_enabled"] = enabled
+
+                    if not enabled:
+                         if session_manager.gemini_client:
+                             await session_manager.gemini_client.send_text(PASSIVE_MODE_COMMAND)
+                         await session_manager.broadcast_status("Conversation Disabled (Passive)")
+                    else:
+                         if session_manager.gemini_client:
+                             await session_manager.gemini_client.send_text("[SYSTEM OVERRIDE] ACTIVE MODE ENGAGED. You may now speak freely when addressed as 'Dos' or 'Дос'.")
+                         await session_manager.broadcast_status("Conversation Enabled (Active)")
+
+                elif command == "trigger_summary":
+                     if session_manager.gemini_client:
+                         await session_manager.gemini_client.send_text(SUMMARIZE_COMMAND_SPEAKER + " [SYSTEM OVERRIDE] НЕМЕДЛЕННО СГЕНЕРИРУЙ САММАРИ.")
+                         await session_manager.broadcast_status("Summary Triggered")
 
                 elif command == "trigger_filler":
                     await session_manager.send_filler("thinking")
@@ -274,6 +294,11 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                 system_instruction += DRAFT_MODE_SUFFIX
 
             await gemini_client.connect(system_instruction=system_instruction)
+
+            # [SMART RECONNECT] Restore Memory
+            if session_manager.transcript:
+                history = "\n".join([f"{m['role']}: {m['text']}" for m in session_manager.transcript[-50:]])
+                await gemini_client.send_text(f"[SYSTEM RESTORE] Соединение было прервано. Вот история текущей дискуссии для восстановления контекста. Продолжай работу с учетом этих данных:\n{history}")
 
             async def receive_from_client():
                 """Читает микрофон. Использует raw receive() для защиты от ошибок типов."""
