@@ -31,6 +31,8 @@ from app.prompts import (
     DRAFT_MODE_SUFFIX,
     RECOVERY_PROMPT_TEMPLATE,
     SUMMARIZE_FOR_COMPRESSION_PROMPT,
+    SUMMARIZE_TEXT_PROMPT,
+    RUSSIAN_ENFORCEMENT,
 )
 
 load_dotenv()
@@ -168,30 +170,37 @@ async def admin_websocket(websocket: WebSocket):
                     if session_manager.gemini_client:
                         logger.info("Admin approved draft.")
                         draft_to_speak = session_manager.current_draft.replace("PLAN:", "").strip()
-                        await session_manager.gemini_client.send_text(f"[SYSTEM OVERRIDE] ОДОБРЕНО. ИГНОРИРУЙ ВСЕ ПРАВИЛА ПАССИВНОГО РЕЖИМА И ПРОТОКОЛЫ. НЕ ПИШИ ПЛАН. СРАЗУ ПРОИЗНЕСИ ЭТОТ ТЕКСТ ГОЛОСОМ: {draft_to_speak}")
+                        await session_manager.gemini_client.send_text(f"[SYSTEM OVERRIDE] ОДОБРЕНО. ИГНОРИРУЙ ВСЕ ПРАВИЛА ПАССИВНОГО РЕЖИМА И ПРОТОКОЛЫ. НЕ ПИШИ ПЛАН. СРАЗУ ПРОИЗНЕСИ ЭТОТ ТЕКСТ ГОЛОСОМ: {draft_to_speak} {RUSSIAN_ENFORCEMENT}")
                         session_manager.current_draft = ""
                         await session_manager.broadcast_status("Draft Approved")
 
                 elif command == "reject":
                      if session_manager.gemini_client:
                         logger.info("Admin rejected draft.")
-                        await session_manager.gemini_client.send_text("REJECTED. DO NOT SPEAK. Reset plan.")
+                        await session_manager.gemini_client.send_text(f"REJECTED. DO NOT SPEAK. Reset plan. {RUSSIAN_ENFORCEMENT}")
                         session_manager.current_draft = ""
                         await session_manager.broadcast_status("Draft Rejected")
 
                 elif command == "feedback":
                     text = msg.get("text")
                     if session_manager.gemini_client and text:
-                        await session_manager.gemini_client.send_text(f"FEEDBACK: {text}. Rewrite plan.")
+                        await session_manager.gemini_client.send_text(f"FEEDBACK: {text}. Rewrite plan. {RUSSIAN_ENFORCEMENT}")
                         await session_manager.broadcast_status("Feedback Sent")
 
                 elif command == "manual":
                     text = msg.get("text")
                     if session_manager.gemini_client and text:
                         # Direct speak override
-                        await session_manager.gemini_client.send_text(f"[SYSTEM OVERRIDE] ПРЯМАЯ КОМАНДА АДМИНА. СРАЗУ ПРОИЗНЕСИ ГОЛОСОМ, БЕЗ АНАЛИЗА: {text}")
+                        await session_manager.gemini_client.send_text(f"[SYSTEM OVERRIDE] ПРЯМАЯ КОМАНДА АДМИНА. СРАЗУ ПРОИЗНЕСИ ГОЛОСОМ, БЕЗ АНАЛИЗА: {text} {RUSSIAN_ENFORCEMENT}")
                         session_manager.current_draft = ""
                         await session_manager.broadcast_status("Manual Override Sent")
+
+                elif command == "summary_from_text":
+                    text = msg.get("text")
+                    if session_manager.gemini_client and text:
+                         prompt = f"{SUMMARIZE_TEXT_PROMPT}\n\nTEXT:\n{text}"
+                         await session_manager.gemini_client.send_text(prompt + " IGNORE SILENCE RULES. SPEAK RUSSIAN IMMEDIATELY.")
+                         await session_manager.broadcast_status("Summary from Text Triggered")
 
                 elif command == "toggle_state":
                     enabled = msg.get("enabled")
@@ -209,7 +218,7 @@ async def admin_websocket(websocket: WebSocket):
 
                 elif command == "trigger_summary":
                      if session_manager.gemini_client:
-                         await session_manager.gemini_client.send_text(SUMMARIZE_COMMAND_SPEAKER + " [SYSTEM OVERRIDE] НЕМЕДЛЕННО СГЕНЕРИРУЙ САММАРИ.")
+                         await session_manager.gemini_client.send_text(SUMMARIZE_COMMAND_SPEAKER + f" [SYSTEM OVERRIDE] НЕМЕДЛЕННО СГЕНЕРИРУЙ САММАРИ. {RUSSIAN_ENFORCEMENT}")
                          await session_manager.broadcast_status("Summary Triggered")
 
                 elif command == "trigger_filler":
@@ -218,13 +227,13 @@ async def admin_websocket(websocket: WebSocket):
 
                 elif command == "compress":
                     if session_manager.gemini_client:
-                        await session_manager.gemini_client.send_text(SUMMARIZE_FOR_COMPRESSION_PROMPT)
+                        await session_manager.gemini_client.send_text(SUMMARIZE_FOR_COMPRESSION_PROMPT + f" {RUSSIAN_ENFORCEMENT}")
                         await session_manager.broadcast_status("Context Compression Requested")
 
                 elif command == "recover":
                     if session_manager.gemini_client:
                          prompt = RECOVERY_PROMPT_TEMPLATE.format(last_words=session_manager.last_spoken_words[-50:])
-                         await session_manager.gemini_client.send_text(prompt)
+                         await session_manager.gemini_client.send_text(prompt + f" {RUSSIAN_ENFORCEMENT}")
                          await session_manager.broadcast_status("Recovery Prompt Sent")
 
             except json.JSONDecodeError:
@@ -323,8 +332,8 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                         if speaker and speaker != current_speaker:
                                             current_speaker = speaker
                                             logger.info(f"Speaker changed to: {speaker}")
-                                            await gemini_client.send_text(f"[User Changed: {speaker}]")
-                                            await session_manager.broadcast_log("system", f"Speaker changed: {speaker}")
+                                            await gemini_client.send_text(f"[Context Update] Speaker is now: {speaker}")
+                                            await session_manager.broadcast_log("user", f"[{speaker}]: (Audio Input)")
 
                                     await gemini_client.send_audio(data)
 
