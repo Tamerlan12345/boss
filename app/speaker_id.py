@@ -99,10 +99,10 @@ class SpeakerIdentifier:
         self.buffer_sample_count = 0
         self.samples_processed = 0
 
-    def process_chunk(self, chunk_bytes: bytes) -> str:
+    def consume_audio(self, chunk_bytes: bytes) -> np.ndarray:
         """
-        Processes a chunk of PCM 16-bit 16kHz audio.
-        Returns the speaker name if identified, else None.
+        Buffers audio chunk and returns a segment if identification is due.
+        Returns segment (np.ndarray) or None.
         """
         if not self.encoder or not self.speakers:
             return None
@@ -113,7 +113,9 @@ class SpeakerIdentifier:
 
         # Convert bytes to float32
         int16_data = np.frombuffer(chunk_bytes, dtype=np.int16)
-        float32_data = int16_data.astype(np.float32) / 32768.0
+        # Optimized: In-place division to avoid allocating second float array
+        float32_data = int16_data.astype(np.float32)
+        float32_data /= 32768.0
 
         chunk_len = len(float32_data)
         self.buffer.append(float32_data)
@@ -125,11 +127,9 @@ class SpeakerIdentifier:
              popped = self.buffer.popleft()
              self.buffer_sample_count -= len(popped)
 
-        # Run identification if we have enough data since last check
-        # Ideally we want a sliding window.
+        self.samples_processed += chunk_len
 
         required_samples = int(self.window_size * self.sample_rate)
-        self.samples_processed += chunk_len
 
         if self.buffer_sample_count >= required_samples and self.samples_processed >= self.check_interval:
             # Reconstruct the last window_size samples
@@ -152,30 +152,47 @@ class SpeakerIdentifier:
             # Take the exact last required_samples
             segment = full_segment[-required_samples:]
 
-            # We optimize by not running every single chunk, maybe every 0.5s worth of chunks?
-            # Now we implement the optimization using check_interval (stride)
             self.samples_processed = 0
+            return segment
 
-            embedding = self.encoder.embed_utterance(segment)
+        return None
 
-            # Normalize input embedding
-            norm = np.linalg.norm(embedding)
-            if norm < 1e-6:
-                return None
-            embedding = embedding / norm
+    def identify_speaker(self, segment: np.ndarray) -> str:
+        """
+        Identifies speaker from a given audio segment.
+        Returns the speaker name if identified, else None.
+        """
+        if segment is None or not self.encoder or not self.speakers:
+            return None
 
-            if len(self.speaker_embeddings) == 0:
-                return None
+        embedding = self.encoder.embed_utterance(segment)
 
-            # Vectorized cosine similarity
-            # self.speaker_embeddings is (N, D), embedding is (D,)
-            # Result is (N,)
-            similarities = np.dot(self.speaker_embeddings, embedding)
+        # Normalize input embedding
+        norm = np.linalg.norm(embedding)
+        if norm < 1e-6:
+            return None
+        embedding = embedding / norm
 
-            best_idx = np.argmax(similarities)
-            max_similarity = similarities[best_idx]
+        if len(self.speaker_embeddings) == 0:
+            return None
 
-            if max_similarity > 0.65: # Threshold (tuned experimentally)
-                return self.speaker_names[best_idx]
+        # Vectorized cosine similarity
+        similarities = np.dot(self.speaker_embeddings, embedding)
 
+        best_idx = np.argmax(similarities)
+        max_similarity = similarities[best_idx]
+
+        if max_similarity > 0.65: # Threshold (tuned experimentally)
+            return self.speaker_names[best_idx]
+
+        return None
+
+    def process_chunk(self, chunk_bytes: bytes) -> str:
+        """
+        Legacy method for processing audio chunks.
+        Buffers audio and runs identification if needed.
+        """
+        segment = self.consume_audio(chunk_bytes)
+        if segment is not None:
+            return self.identify_speaker(segment)
         return None
