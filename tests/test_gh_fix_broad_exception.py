@@ -7,10 +7,44 @@ sys.modules['torchaudio'] = MagicMock()
 sys.modules['torch'] = MagicMock()
 sys.modules['numpy'] = MagicMock()
 sys.modules['soundfile'] = MagicMock()
+sys.modules['uvicorn'] = MagicMock()
+sys.modules['dotenv'] = MagicMock()
+sys.modules['websockets'] = MagicMock()
+sys.modules['pydantic'] = MagicMock()
+
+# Mock fastapi
+mock_fastapi = MagicMock()
+class MockWebSocket:
+    async def receive(self): pass
+    async def send_text(self, data): pass
+    async def send_bytes(self, data): pass
+    async def accept(self): pass
+    async def close(self): pass
+mock_fastapi.WebSocket = MockWebSocket
+mock_fastapi.WebSocketDisconnect = Exception
+
+# Configure FastAPI app decorators to be transparent
+mock_app = MagicMock()
+def identity_decorator(*args, **kwargs):
+    def decorator(func):
+        return func
+    return decorator
+mock_app.websocket.side_effect = identity_decorator
+mock_app.get.side_effect = identity_decorator
+mock_app.on_event.side_effect = identity_decorator
+mock_fastapi.FastAPI.return_value = mock_app
+
+sys.modules['fastapi'] = mock_fastapi
+sys.modules['fastapi.staticfiles'] = MagicMock()
+sys.modules['fastapi.templating'] = MagicMock()
+sys.modules['fastapi.requests'] = MagicMock()
 
 import unittest
 from unittest.mock import patch
-from fastapi import WebSocket, WebSocketDisconnect
+# from fastapi import WebSocket, WebSocketDisconnect # Removed real import
+WebSocket = MockWebSocket
+WebSocketDisconnect = Exception
+
 import asyncio
 # Make sure we can find 'app'
 sys.path.append('.')
@@ -19,6 +53,7 @@ import app.main
 class TestBroadExceptionFix(unittest.IsolatedAsyncioTestCase):
     async def test_exception_in_receive_loop(self):
         print("\nRunning regression test for broad exception fix...")
+        original_sleep = asyncio.sleep
         # Patch dependencies IN app.main
         with patch('app.main.GeminiClient') as MockGemini, \
              patch('app.main.SpeakerIdentifier') as MockIdentifier, \
@@ -26,9 +61,29 @@ class TestBroadExceptionFix(unittest.IsolatedAsyncioTestCase):
              patch('app.main.asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
 
             # Configure sleep to break keep_alive loop
+            # Delay the crash until enough processing has happened
             async def sleep_side_effect(duration):
+                # Yield control to allow other tasks to run
+                await original_sleep(0)
                 if duration == 5:
-                    raise Exception("Stop Keep Alive")
+                    # Check if send_audio has been called enough times (chunk1 and chunk2)
+                    # mock_gemini is not fully configured yet in this scope?
+                    # We can access mock_gemini variable from outer scope if defined.
+                    # But mock_gemini is defined below.
+                    # However, MockGemini.return_value is the instance.
+                    instance = MockGemini.return_value
+                    if instance.send_audio.call_count >= 2:
+                         raise Exception("Stop Keep Alive")
+
+                    # Also crash if too many iterations (safety)
+                    if hasattr(sleep_side_effect, 'calls'):
+                        sleep_side_effect.calls += 1
+                    else:
+                        sleep_side_effect.calls = 1
+
+                    if sleep_side_effect.calls > 100:
+                         raise Exception("Stop Keep Alive Timeout")
+
                 return None
             mock_sleep.side_effect = sleep_side_effect
 
@@ -43,8 +98,9 @@ class TestBroadExceptionFix(unittest.IsolatedAsyncioTestCase):
             mock_gemini.close = AsyncMock()
 
             mock_identifier = MockIdentifier.return_value
-            # Make process_chunk raise an Exception on the first call, succeed on second
-            mock_identifier.process_chunk.side_effect = [Exception("Processing Error"), "Speaker1"]
+            # Make consume_audio raise an Exception on the first call, return segment on second
+            mock_identifier.consume_audio.side_effect = [Exception("Processing Error"), "segment2"]
+            mock_identifier.identify_speaker.return_value = "Speaker1"
 
             mock_ws = AsyncMock(spec=WebSocket)
             # Simulate:
