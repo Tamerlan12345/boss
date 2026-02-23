@@ -100,7 +100,9 @@ class SessionManager:
                         # Let's send raw bytes.
                         data = f.read()
                         # If it's a valid WAV, client might play it.
-                        # For now, send as is.
+                        if data.startswith(b'RIFF'):
+                            data = data[44:]
+
                         await self.active_client_ws.send_bytes(data)
                         logger.info(f"Sent filler: {filler_name}")
             except Exception as e:
@@ -165,7 +167,7 @@ async def admin_websocket(websocket: WebSocket):
                 if command == "approve":
                     if session_manager.gemini_client:
                         logger.info("Admin approved draft.")
-                        await session_manager.gemini_client.send_text("APPROVED")
+                        await session_manager.gemini_client.send_text(f"APPROVED. IGNORE ALL PASSIVE RULES. SPEAK THIS ALOUD: {session_manager.current_draft}")
                         session_manager.current_draft = ""
                         await session_manager.broadcast_status("Draft Approved")
 
@@ -329,13 +331,13 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                         elif msg_data.get("type") == "trigger_introduce":
                                             if mode == "speaker":
                                                 state["intro_active"] = True
-                                                await gemini_client.send_text(INTRODUCE_COMMAND)
+                                                await gemini_client.send_text(INTRODUCE_COMMAND + " IGNORE SILENCE RULES. SPEAK IMMEDIATELY.")
 
                                         elif msg_data.get("type") == "trigger_summary":
                                             logger.info("Triggering summary generation...")
                                             if mode == "speaker":
                                                 state["processing_summary"] = True
-                                                await gemini_client.send_text(SUMMARIZE_COMMAND_SPEAKER)
+                                                await gemini_client.send_text(SUMMARIZE_COMMAND_SPEAKER + " IGNORE SILENCE RULES. SPEAK IMMEDIATELY.")
                                             else:
                                                 await gemini_client.send_text(SUMMARIZE_PROMPT_PANEL)
                                     except json.JSONDecodeError:
@@ -399,10 +401,9 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                 if len(session_manager.last_spoken_words) > 500:
                                     session_manager.last_spoken_words = session_manager.last_spoken_words[-500:]
 
-                                if "PLAN:" in text_chunk:
-                                    plan_text = text_chunk
-                                    await session_manager.broadcast_draft(plan_text)
-                                    await session_manager.send_filler("thinking")
+                                if state.get("draft_mode_enabled"):
+                                    session_manager.current_draft += text_chunk + " "
+                                    await session_manager.broadcast_draft(session_manager.current_draft)
                                     continue
 
                                 if "[SILENCE]" in text_chunk:
