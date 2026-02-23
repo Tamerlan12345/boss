@@ -15,22 +15,23 @@ class GeminiClient:
         self.url = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key={self.api_key}"
         self.ws = None
 
-    async def connect(self, system_instruction: str = None):
+    async def connect(self, system_instruction: str = None, response_modalities: list = None):
         """Establishes the WebSocket connection and sends setup message."""
         try:
             self.ws = await websockets.connect(self.url)
-            await self._send_setup(system_instruction)
+            await self._send_setup(system_instruction, response_modalities)
             logger.info("Connected to Gemini Live API")
         except Exception as e:
             logger.error(f"Failed to connect to Gemini: {e}")
             raise
 
-    async def _send_setup(self, system_instruction: str = None):
+    async def _send_setup(self, system_instruction: str = None, response_modalities: list = None):
+        modalities = response_modalities if response_modalities else ["AUDIO"]
         setup_msg = {
             "setup": {
                 "model": "models/gemini-2.5-flash-native-audio-preview-12-2025",
                 "generationConfig": {
-                    "responseModalities": ["AUDIO"],
+                    "responseModalities": modalities,
                     "speechConfig": {
                         "voiceConfig": {
                             "prebuiltVoiceConfig": {

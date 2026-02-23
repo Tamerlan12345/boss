@@ -59,3 +59,27 @@ SIMLI_WARMUP_DEFAULT = (
     'Generate audio immediately. Say exactly this phrase with energy: '
     '"Я ИИ спикер Dos. Сегодня я буду вместе с вами разбирать и участвовать в теме обсуждения, которую вы зададите."'
 )
+
+# --- NEW PROMPTS FOR ADMIN CONTROL & STABILIZATION ---
+
+DRAFT_MODE_SUFFIX = (
+    "\n\n[PROTOCOL: DRAFT & APPROVE]\n"
+    "When you are addressed as 'Dos' (or 'Дос'):\n"
+    "1. DO NOT speak immediately.\n"
+    "2. Output a text plan starting with 'PLAN: ' (e.g., 'PLAN: I will explain the Q3 results...').\n"
+    "3. Wait for the user to say 'APPROVED'.\n"
+    "4. When 'APPROVED' is received, generate the audio response based on the plan."
+)
+
+RECOVERY_PROMPT_TEMPLATE = (
+    "SYSTEM: A connection error occurred. Re-establishing context.\n"
+    "The last words you successfully spoke were: '{last_words}'...\n"
+    "Please apologize for the interruption (briefly) and continue your thought exactly from where you left off."
+)
+
+SUMMARIZE_FOR_COMPRESSION_PROMPT = (
+    "SYSTEM: COMPRESS CONTEXT.\n"
+    "Please provide a concise textual summary (bullet points) of the entire conversation so far.\n"
+    "Capture the key topics, speakers, and decisions.\n"
+    "This summary will be used to reboot your memory."
+)
