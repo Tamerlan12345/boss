@@ -35,7 +35,8 @@ body {
     background-color: var(--bg-dark);
     color: var(--text-white);
     font-family: 'Montserrat', sans-serif; /* Основной шрифт */
-    height: 100vh;
+    min-height: 100vh;
+    min-height: 100dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -225,7 +226,8 @@ button {
 
 /* Визуализатор */
 #audio-visualizer {
-    width: 100%; background: transparent;
+    width: 100% !important; height: auto; max-width: 100%;
+    background: transparent;
     border-bottom: 1px solid rgba(255,255,255,0.1);
     opacity: 0.7;
 }
@@ -276,4 +278,65 @@ button {
     .bg-watermark { background-size: 90%; opacity: 0.08; }
     .main-logo { max-width: 180px; }
     .live-badge { font-size: 9px; }
+}
+
+@media (max-width: 480px) {
+    body {
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .main-terminal {
+        height: auto !important;
+        width: 95%;
+        margin: 10px auto;
+    }
+
+    .terminal-body {
+        padding: 15px 10px;
+        gap: 20px;
+    }
+
+    .corner {
+        display: none;
+    }
+
+    .avatar-section {
+        height: auto;
+        flex: none;
+        width: 100%;
+    }
+
+    .avatar-frame {
+        height: 250px;
+    }
+
+    .controls-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    button {
+        min-height: 44px;
+        font-size: 11px;
+        padding: 12px;
+    }
+
+    .logs-section {
+        height: 250px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .logs-content {
+        font-size: 13px;
+    }
+
+    .main-logo {
+        max-width: 140px;
+    }
+
+    .logo-container {
+        margin-bottom: 1rem;
+    }
 }
