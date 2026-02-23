@@ -5,8 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Панель Управления Dos</title>
     <style>
-        body { font-family: 'Courier New', monospace; background: #1a1a1a; color: #0f0; margin: 0; padding: 20px; display: flex; height: 100vh; box-sizing: border-box; }
-        .column { flex: 1; border: 1px solid #333; padding: 10px; display: flex; flex-direction: column; overflow: hidden; margin: 0 5px; background: #222; }
+        body { font-family: 'Courier New', monospace; background: #1a1a1a; color: #0f0; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        .tab-nav { display: flex; border-bottom: 1px solid #333; margin-bottom: 10px; }
+        .tab-btn { padding: 10px 20px; background: #222; color: #888; border: none; cursor: pointer; font-family: inherit; font-weight: bold; margin-right: 5px; }
+        .tab-btn:hover { background: #333; color: #fff; }
+        .tab-btn.active { background: #004400; color: #0f0; border-bottom: 2px solid #0f0; }
+        .tab-content { display: none; height: calc(100vh - 80px); overflow: hidden; gap: 10px; }
+        .tab-content.active { display: flex; }
+
+        .column { flex: 1; border: 1px solid #333; padding: 10px; display: flex; flex-direction: column; overflow: hidden; background: #222; }
         .logs { overflow-y: auto; flex: 1; white-space: pre-wrap; font-size: 0.9em; padding: 5px; background: #000; border: 1px solid #333; }
         .control-panel { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
         textarea { background: #000; color: #0f0; border: 1px solid #333; padding: 5px; min-height: 80px; font-family: inherit; resize: vertical; }
@@ -25,61 +32,84 @@
         .log-user { color: #8af; }
         .log-ai { color: #f8a; }
         .log-system { color: #aa0; }
+        .speaker-tag { cursor: pointer; text-decoration: underline; color: #8af; }
+        .speaker-tag:hover { color: #fff; }
     </style>
 </head>
 <body>
-    <div class="column">
-        <h2>Живые Логи</h2>
-        <div id="logs" class="logs"></div>
+    <div class="tab-nav">
+        <button class="tab-btn active" onclick="openTab('broadcast')">Эфир и Управление</button>
+        <button class="tab-btn" onclick="openTab('conversation')">Разговор</button>
+        <button class="tab-btn" onclick="openTab('settings')">Настройки</button>
     </div>
 
-    <div class="column">
-        <h2>Контроль ИИ (Режим Черновика)</h2>
-        <div class="status" id="connection-status">Отключено</div>
+    <!-- Tab 1: Broadcast & Control -->
+    <div id="broadcast" class="tab-content active" style="flex-direction: row;">
+        <div class="column">
+            <h2>Контроль ИИ (Режим Черновика)</h2>
+            <div class="status" id="connection-status">Отключено</div>
 
-        <div class="control-panel">
-            <label>Текущий Черновик (Мысли ИИ):</label>
-            <textarea id="draft-text" readonly style="background: #222; color: #888; cursor: not-allowed;"></textarea>
-            <div style="display: flex; gap: 5px;">
-                <button class="approve" id="approve-btn" onclick="approveDraft()" disabled>Одобрить (Пустить в эфир)</button>
-                <button class="reject" id="reject-btn" onclick="rejectDraft()" disabled>Отклонить (Запретить говорить)</button>
+            <div class="control-panel">
+                <label>Текущий Черновик (Мысли ИИ):</label>
+                <textarea id="draft-text" readonly style="background: #222; color: #888; cursor: not-allowed;"></textarea>
+                <div style="display: flex; gap: 5px;">
+                    <button class="approve" id="approve-btn" onclick="approveDraft()" disabled>Одобрить (Пустить в эфир)</button>
+                    <button class="reject" id="reject-btn" onclick="rejectDraft()" disabled>Отклонить (Запретить говорить)</button>
+                </div>
+
+                <hr style="border-color: #333; width: 100%;">
+
+                <label>Изменить направление (Обратная связь):</label>
+                <textarea id="feedback-text" placeholder="Например: Не упоминай релиз, скажи про команду..."></textarea>
+                <button onclick="sendFeedback()">Переписать черновик</button>
+
+                <hr style="border-color: #333; width: 100%;">
+
+                <label>Ручное управление (Сказать напрямую):</label>
+                <textarea id="manual-text" placeholder="Напишите точный текст, который должен произнести Дос..."></textarea>
+                <button onclick="sendManual()">Озвучить этот текст</button>
             </div>
+        </div>
 
-            <hr style="border-color: #333; width: 100%;">
+        <div class="column">
+            <h2>Экстренные Действия</h2>
+            <div class="control-panel">
+                <label>Управление Разговором:</label>
+                <button onclick="toggleAI(true)" class="approve">Включить разговор (Активный)</button>
+                <button onclick="toggleAI(false)" class="reject">Отключить разговор (Пассивный)</button>
 
-            <label>Изменить направление (Обратная связь):</label>
-            <textarea id="feedback-text" placeholder="Например: Не упоминай релиз, скажи про команду..."></textarea>
-            <button onclick="sendFeedback()">Переписать черновик</button>
+                <hr style="border-color: #333; width: 100%;">
 
-            <hr style="border-color: #333; width: 100%;">
+                <label>Управление Саммари:</label>
+                <textarea id="summary-text" placeholder="Вставьте текст для саммари..."></textarea>
+                <button onclick="summaryFromText()">Сделать саммари по тексту</button>
+                <button onclick="triggerAdminSummary()">Сделать Саммари текущей сессии (2-3 мин)</button>
 
-            <label>Ручное управление (Сказать напрямую):</label>
-            <textarea id="manual-text" placeholder="Напишите точный текст, который должен произнести Дос..."></textarea>
-            <button onclick="sendManual()">Озвучить этот текст</button>
+                <hr style="border-color: #333; width: 100%;">
+
+                <button onclick="triggerFiller()">Включить заглушку (Думаю...)</button>
+                <div style="margin-top: 20px; font-size: 0.8em; color: #666;">
+                    Статус: <span id="server-status">Неизвестен</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="column">
-        <h2>Экстренные Действия</h2>
-        <div class="control-panel">
-            <label>Управление Разговором:</label>
-            <button onclick="toggleAI(true)" class="approve">Включить разговор (Активный)</button>
-            <button onclick="toggleAI(false)" class="reject">Отключить разговор (Пассивный)</button>
+    <!-- Tab 2: Conversation -->
+    <div id="conversation" class="tab-content">
+        <div class="column" style="width: 100%;">
+            <h2>Живые Логи (Кликните на спикера чтобы переименовать)</h2>
+            <div id="logs" class="logs"></div>
+        </div>
+    </div>
 
-            <hr style="border-color: #333; width: 100%;">
-
-            <label>Управление Саммари:</label>
-            <textarea id="summary-text" placeholder="Вставьте текст для саммари..."></textarea>
-            <button onclick="summaryFromText()">Сделать саммари по тексту</button>
-            <button onclick="triggerAdminSummary()">Сделать Саммари текущей сессии</button>
-
-            <hr style="border-color: #333; width: 100%;">
-
-            <button onclick="triggerFiller()">Включить заглушку (Думаю...)</button>
-            <button onclick="compressContext()">Сжать контекст памяти</button>
-            <button onclick="recoverSession()" style="background: #a50;">Восстановить соединение</button>
-            <div style="margin-top: 20px; font-size: 0.8em; color: #666;">
-                Статус: <span id="server-status">Неизвестен</span>
+    <!-- Tab 3: Settings -->
+    <div id="settings" class="tab-content">
+         <div class="column">
+            <h2>Системные Настройки</h2>
+            <div class="control-panel">
+                <button onclick="compressContext()">Сжать контекст памяти</button>
+                <button onclick="recoverSession()" style="background: #a50;">Восстановить соединение</button>
             </div>
         </div>
     </div>
@@ -88,6 +118,23 @@
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}/ws/admin`;
         let ws;
+
+        function openTab(tabName) {
+            const tabs = document.querySelectorAll('.tab-content');
+            const buttons = document.querySelectorAll('.tab-btn');
+
+            tabs.forEach(tab => tab.classList.remove('active'));
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            document.getElementById(tabName).classList.add('active');
+
+            // Highlight active button
+            buttons.forEach(btn => {
+                if (btn.getAttribute('onclick').includes(tabName)) {
+                    btn.classList.add('active');
+                }
+            });
+        }
 
         function connect() {
             ws = new WebSocket(wsUrl);
@@ -104,27 +151,20 @@
                 const data = JSON.parse(event.data);
 
                 if (data.type === 'log') {
+                    renderLogEntry(data);
+                }
+                else if (data.type === 'history_update') {
+                    // Full history refresh
                     const logsDiv = document.getElementById('logs');
-                    const entry = document.createElement('div');
-                    entry.className = 'log-entry';
-
-                    const roleSpan = document.createElement('span');
-                    roleSpan.className = `log-role log-${data.role}`;
-                    roleSpan.textContent = `[${data.role.toUpperCase()}] `;
-
-                    const textSpan = document.createElement('span');
-                    textSpan.textContent = data.text;
-
-                    entry.appendChild(roleSpan);
-                    entry.appendChild(textSpan);
-                    logsDiv.appendChild(entry);
-                    logsDiv.scrollTop = logsDiv.scrollHeight;
+                    logsDiv.innerHTML = ''; // Clear existing
+                    data.transcript.forEach(item => {
+                        renderLogEntry(item);
+                    });
                 }
                 else if (data.type === 'draft') {
                     document.getElementById('draft-text').value = data.text;
                     document.getElementById('approve-btn').disabled = false;
                     document.getElementById('reject-btn').disabled = false;
-                    // Highlight that action is needed
                     document.getElementById('draft-text').style.borderColor = '#ff0';
                 }
                 else if (data.type === 'status') {
@@ -144,6 +184,56 @@
                 serverStatus.textContent = 'Офлайн';
                 setTimeout(connect, 2000);
             };
+        }
+
+        function renderLogEntry(data) {
+            const logsDiv = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            const roleSpan = document.createElement('span');
+            roleSpan.className = `log-role log-${data.role}`;
+
+            if (data.role === 'user') {
+                let displayText = data.role.toUpperCase();
+                let speakerName = data.role;
+
+                const match = data.text.match(/^\[(.*?)\]:/);
+                if (match) {
+                    speakerName = match[1];
+                    displayText = speakerName;
+                }
+
+                roleSpan.textContent = `[${displayText}] `;
+                roleSpan.className += ' speaker-tag';
+                roleSpan.onclick = function() {
+                    renameSpeaker(data.id, speakerName);
+                };
+            } else {
+                roleSpan.textContent = `[${data.role.toUpperCase()}] `;
+            }
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = data.text;
+
+            entry.appendChild(roleSpan);
+            entry.appendChild(textSpan);
+            logsDiv.appendChild(entry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function renameSpeaker(msgId, currentName) {
+            if (!msgId) return;
+            const newName = prompt(`Введите новое имя для ${currentName}:`, currentName);
+            if (newName && newName !== currentName) {
+                if (ws) {
+                    ws.send(JSON.stringify({
+                        type: 'update_speaker',
+                        msg_id: msgId,
+                        new_name: newName
+                    }));
+                }
+            }
         }
 
         function approveDraft() {

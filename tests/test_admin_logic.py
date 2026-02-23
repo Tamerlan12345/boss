@@ -93,7 +93,10 @@ class TestAdminLogic(unittest.IsolatedAsyncioTestCase):
         except Exception as e:
             print(f"Caught exception in test: {e}")
 
-        mock_gemini.send_text.assert_called_with("APPROVED")
+        # Check that send_text was called with a string containing essential parts
+        args, _ = mock_gemini.send_text.call_args
+        self.assertIn("[SYSTEM OVERRIDE] ОДОБРЕНО", args[0])
+        self.assertIn("Plan A", args[0])
 
     async def test_admin_websocket_feedback(self):
         mock_gemini = MagicMock()
@@ -114,7 +117,8 @@ class TestAdminLogic(unittest.IsolatedAsyncioTestCase):
         except Exception:
             pass
 
-        mock_gemini.send_text.assert_called_with("FEEDBACK: No release. Rewrite plan.")
+        args, _ = mock_gemini.send_text.call_args
+        self.assertIn("FEEDBACK: No release. Rewrite plan.", args[0])
 
     async def test_admin_websocket_trigger_filler(self):
         mock_client_ws = MagicMock()
