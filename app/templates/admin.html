@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dos Admin Panel</title>
+    <style>
+        body { font-family: 'Courier New', monospace; background: #1a1a1a; color: #0f0; margin: 0; padding: 20px; display: flex; height: 100vh; box-sizing: border-box; }
+        .column { flex: 1; border: 1px solid #333; padding: 10px; display: flex; flex-direction: column; overflow: hidden; margin: 0 5px; background: #222; }
+        .logs { overflow-y: auto; flex: 1; white-space: pre-wrap; font-size: 0.9em; padding: 5px; background: #000; border: 1px solid #333; }
+        .control-panel { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+        textarea { background: #000; color: #0f0; border: 1px solid #333; padding: 5px; min-height: 80px; font-family: inherit; resize: vertical; }
+        button { background: #333; color: #fff; border: 1px solid #555; padding: 10px; cursor: pointer; font-family: inherit; font-weight: bold; }
+        button:hover { background: #555; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.approve { background: #006400; border-color: #008000; }
+        button.approve:hover { background: #008000; }
+        button.reject { background: #8b0000; border-color: #a00000; }
+        button.reject:hover { background: #a00000; }
+        .status { font-size: 0.8em; color: #888; margin-bottom: 10px; text-transform: uppercase; }
+        h2 { margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 5px; font-size: 1.2em; text-align: center; }
+        label { font-size: 0.8em; color: #aaa; margin-bottom: 2px; display: block; }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #222; padding-bottom: 2px; }
+        .log-role { font-weight: bold; color: #fff; }
+        .log-user { color: #8af; }
+        .log-ai { color: #f8a; }
+        .log-system { color: #aa0; }
+    </style>
+</head>
+<body>
+    <div class="column">
+        <h2>Live Logs</h2>
+        <div id="logs" class="logs"></div>
+    </div>
+
+    <div class="column">
+        <h2>AI Control (Draft Mode)</h2>
+        <div class="status" id="connection-status">Disconnected</div>
+
+        <div class="control-panel">
+            <label>Current Draft (Plan):</label>
+            <textarea id="draft-text" readonly></textarea>
+            <div style="display: flex; gap: 5px;">
+                <button class="approve" id="approve-btn" onclick="approveDraft()" disabled>Approve (Go Live)</button>
+                <button class="reject" id="reject-btn" onclick="rejectDraft()" disabled>Reject (Silence)</button>
+            </div>
+
+            <hr style="border-color: #333; width: 100%;">
+
+            <label>Change Course (Feedback):</label>
+            <textarea id="feedback-text" placeholder="e.g. Don't mention the release, talk about the team instead..."></textarea>
+            <button onclick="sendFeedback()">Regenerate Draft</button>
+
+            <hr style="border-color: #333; width: 100%;">
+
+            <label>Manual Override (Direct Speak):</label>
+            <textarea id="manual-text" placeholder="Type exactly what you want Dos to say..."></textarea>
+            <button onclick="sendManual()">Speak This Text</button>
+        </div>
+    </div>
+
+    <div class="column">
+        <h2>Emergency / Actions</h2>
+        <div class="control-panel">
+            <button onclick="triggerFiller()">Play Filler (Thinking...)</button>
+            <button onclick="compressContext()">Compress Context</button>
+            <button onclick="recoverSession()" style="background: #a50;">Recover / Reconnect</button>
+            <div style="margin-top: 20px; font-size: 0.8em; color: #666;">
+                Status: <span id="server-status">Unknown</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws/admin`;
+        let ws;
+
+        function connect() {
+            ws = new WebSocket(wsUrl);
+            const statusDiv = document.getElementById('connection-status');
+            const serverStatus = document.getElementById('server-status');
+
+            ws.onopen = () => {
+                statusDiv.textContent = 'Connected';
+                statusDiv.style.color = '#0f0';
+                serverStatus.textContent = 'Online';
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'log') {
+                    const logsDiv = document.getElementById('logs');
+                    const entry = document.createElement('div');
+                    entry.className = 'log-entry';
+
+                    const roleSpan = document.createElement('span');
+                    roleSpan.className = `log-role log-${data.role}`;
+                    roleSpan.textContent = `[${data.role.toUpperCase()}] `;
+
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = data.text;
+
+                    entry.appendChild(roleSpan);
+                    entry.appendChild(textSpan);
+                    logsDiv.appendChild(entry);
+                    logsDiv.scrollTop = logsDiv.scrollHeight;
+                }
+                else if (data.type === 'draft') {
+                    document.getElementById('draft-text').value = data.text;
+                    document.getElementById('approve-btn').disabled = false;
+                    document.getElementById('reject-btn').disabled = false;
+                    // Highlight that action is needed
+                    document.getElementById('draft-text').style.borderColor = '#ff0';
+                }
+                else if (data.type === 'status') {
+                    serverStatus.textContent = data.message;
+                    if (data.message === 'Draft Approved' || data.message === 'Draft Rejected') {
+                         document.getElementById('draft-text').value = '';
+                         document.getElementById('approve-btn').disabled = true;
+                         document.getElementById('reject-btn').disabled = true;
+                         document.getElementById('draft-text').style.borderColor = '#333';
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                statusDiv.textContent = 'Disconnected (Retrying...)';
+                statusDiv.style.color = '#f00';
+                serverStatus.textContent = 'Offline';
+                setTimeout(connect, 2000);
+            };
+        }
+
+        function approveDraft() {
+            if (ws) ws.send(JSON.stringify({type: 'approve'}));
+        }
+
+        function rejectDraft() {
+            if (ws) ws.send(JSON.stringify({type: 'reject'}));
+        }
+
+        function sendFeedback() {
+            const text = document.getElementById('feedback-text').value;
+            if (ws && text) {
+                ws.send(JSON.stringify({type: 'feedback', text: text}));
+                document.getElementById('feedback-text').value = '';
+            }
+        }
+
+        function sendManual() {
+            const text = document.getElementById('manual-text').value;
+            if (ws && text) {
+                ws.send(JSON.stringify({type: 'manual', text: text}));
+                document.getElementById('manual-text').value = '';
+            }
+        }
+
+        function triggerFiller() {
+            if (ws) ws.send(JSON.stringify({type: 'trigger_filler'}));
+        }
+
+        function compressContext() {
+            if (ws) ws.send(JSON.stringify({type: 'compress'}));
+        }
+
+        function recoverSession() {
+            if (ws) ws.send(JSON.stringify({type: 'recover'}));
+        }
+
+        connect();
+    </script>
+</body>
+</html>
