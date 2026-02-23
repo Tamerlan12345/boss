@@ -250,6 +250,21 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
 
                     elif isinstance(chunk, str):
                         if "[SILENCE]" in chunk:
+                            # Flush remaining audio buffer if valid (Short Answer Fix)
+                            if len(audio_buffer) > 0 and not is_silenced:
+                                should_flush = True
+                                # Re-verify conditions
+                                if mode == "panel" and not state["speaking_enabled"]:
+                                    should_flush = False
+                                elif mode == "speaker":
+                                    if state["processing_summary"]:
+                                        should_flush = False
+                                    elif not state["speaker_active"] and not state["intro_active"]:
+                                        should_flush = False
+
+                                if should_flush:
+                                    await websocket.send_bytes(bytes(audio_buffer))
+
                             is_silenced = True
                             audio_buffer.clear() # Очищаем текущий буфер вывода
 
@@ -259,8 +274,8 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                     state["processing_summary"] = False
                                     await websocket.send_text(json.dumps({"type": "summary_done"}))
 
-                                    # Edge case: If active mode was enabled during generation, send buffer now
-                                    if state["speaker_active"] and len(summary_buffer) > 0:
+                                    # Always send summary buffer regardless of active state (Passive Summary Fix)
+                                    if len(summary_buffer) > 0:
                                         await websocket.send_bytes(bytes(summary_buffer))
                                         summary_buffer.clear()
 
@@ -307,7 +322,16 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                 pass
 
         # Запускаем ВСЕ задачи параллельно: чтение микрофона, отправку звука и пинги
-        await asyncio.gather(receive_from_client(), send_to_client(), keep_alive())
+        # Graceful Shutdown: Cancel pending tasks when one fails/completes (e.g. client disconnect)
+        tasks = [
+            asyncio.create_task(receive_from_client()),
+            asyncio.create_task(send_to_client()),
+            asyncio.create_task(keep_alive())
+        ]
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+        for task in pending:
+            task.cancel()
 
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
