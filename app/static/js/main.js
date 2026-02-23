@@ -7,6 +7,9 @@ let avatar = null;
 let animationId;
 let analyser;
 let dataArray;
+let processor;
+let source;
+let shouldReconnect = false;
 
 const connectBtn = document.getElementById('connectBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
@@ -173,8 +176,6 @@ class SimliAvatar {
 
     start() {
         appendToLog('SYSTEM', "Starting Simli Session...");
-        
-        // Configuration is now handled in Initialize
         this.simliClient.start();
     }
 
@@ -194,10 +195,91 @@ class SimliAvatar {
     }
 }
 
+function cleanupAudio() {
+    if (processor) processor.disconnect();
+    if (source) source.disconnect();
+    if (audioContext) audioContext.close();
+    if (avatar) avatar.close();
+    cancelAnimationFrame(animationId);
+}
+
+function connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${location.host}/ws?mode=${mode}`);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+        isConnected = true;
+        if (mode === 'speaker') {
+            summaryBtn.style.display = 'inline-block';
+            introBtn.style.display = 'inline-block';
+            activeToggleBtn.style.display = 'inline-block';
+
+            // Initialize in Passive Mode
+            ws.send(JSON.stringify({ type: "toggle_active", enabled: false }));
+        }
+        statusDiv.textContent = 'SYSTEM: CONNECTED';
+        statusDiv.style.color = "var(--acid-green)";
+        disconnectBtn.disabled = false;
+        appendToLog('SYSTEM', 'Neural Uplink Established.');
+        drawVisualizer();
+    };
+
+    ws.onclose = () => {
+        if (shouldReconnect) {
+            isConnected = false;
+            statusDiv.textContent = 'SYSTEM: RECONNECTING...';
+            statusDiv.style.color = "orange";
+            appendToLog('SYSTEM', 'Connection lost. Retrying in 3 seconds...');
+            setTimeout(connectWebSocket, 3000);
+        } else {
+            isConnected = false;
+            statusDiv.textContent = 'SYSTEM: OFFLINE';
+            statusDiv.style.color = "var(--text-color)";
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            appendToLog('SYSTEM', 'Neural Uplink Terminated.');
+            cleanupAudio();
+        }
+    };
+
+    ws.onerror = (e) => {
+        appendToLog('SYSTEM', `WebSocket error: ${e}`);
+    };
+
+    ws.onmessage = async (event) => {
+        if (event.data instanceof ArrayBuffer) {
+            // Audio
+            const uint8 = new Uint8Array(event.data);
+            if (avatar) {
+                avatar.speak(uint8);
+            }
+        } else {
+            // Text / JSON
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'log') {
+                    appendToLog(msg.role, msg.text);
+                } else if (msg.type === 'summary_done') {
+                    summaryBtn.disabled = false;
+                    summaryBtn.textContent = "GENERATE SUMMARY";
+                    appendToLog('SYSTEM', "Summary generation complete.");
+                } else {
+                    appendToLog('UNKNOWN', event.data);
+                }
+            } catch (e) {
+                // Fallback for plain text if any
+                appendToLog('INFO', event.data);
+            }
+        }
+    };
+}
+
 connectBtn.onclick = async () => {
     try {
         statusDiv.textContent = 'INITIATING HANDSHAKE...';
         connectBtn.disabled = true;
+        shouldReconnect = true;
 
         // 1. Start Simli Avatar
         avatar = new SimliAvatar(videoElement, audioElement);
@@ -214,8 +296,8 @@ connectBtn.onclick = async () => {
         await audioContext.audioWorklet.addModule('/static/js/audio-processor.js');
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const source = audioContext.createMediaStreamSource(stream);
-        const processor = new AudioWorkletNode(audioContext, 'pcm-processor');
+        source = audioContext.createMediaStreamSource(stream);
+        processor = new AudioWorkletNode(audioContext, 'pcm-processor');
 
         source.connect(analyser); // Visualizer
         source.connect(processor);
@@ -224,75 +306,11 @@ connectBtn.onclick = async () => {
         drawVisualizer();
 
         // 3. Connect to Backend WebSocket
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${location.host}/ws?mode=${mode}`);
-        ws.binaryType = 'arraybuffer';
-
-        ws.onopen = () => {
-            isConnected = true;
-            if (mode === 'speaker') {
-                summaryBtn.style.display = 'inline-block';
-                introBtn.style.display = 'inline-block';
-                activeToggleBtn.style.display = 'inline-block';
-
-                // Initialize in Passive Mode
-                ws.send(JSON.stringify({ type: "toggle_active", enabled: false }));
-            }
-            statusDiv.textContent = 'SYSTEM: CONNECTED';
-            statusDiv.style.color = "var(--acid-green)";
-            disconnectBtn.disabled = false;
-            appendToLog('SYSTEM', 'Neural Uplink Established.');
-        };
-
-        ws.onclose = () => {
-            isConnected = false;
-            statusDiv.textContent = 'SYSTEM: OFFLINE';
-            statusDiv.style.color = "var(--text-color)";
-            connectBtn.disabled = false;
-            disconnectBtn.disabled = true;
-            appendToLog('SYSTEM', 'Neural Uplink Terminated.');
-
-            processor.disconnect();
-            source.disconnect();
-            if (audioContext) audioContext.close();
-            if (avatar) avatar.close();
-            cancelAnimationFrame(animationId);
-        };
-
-        ws.onerror = (e) => {
-            appendToLog('SYSTEM', `WebSocket error: ${e}`);
-        };
-
-        ws.onmessage = async (event) => {
-            if (event.data instanceof ArrayBuffer) {
-                // Audio
-                const uint8 = new Uint8Array(event.data);
-                if (avatar) {
-                    avatar.speak(uint8);
-                }
-            } else {
-                // Text / JSON
-                try {
-                    const msg = JSON.parse(event.data);
-                    if (msg.type === 'log') {
-                        appendToLog(msg.role, msg.text);
-                    } else if (msg.type === 'summary_done') {
-                        summaryBtn.disabled = false;
-                        summaryBtn.textContent = "GENERATE SUMMARY";
-                        appendToLog('SYSTEM', "Summary generation complete.");
-                    } else {
-                        appendToLog('UNKNOWN', event.data);
-                    }
-                } catch (e) {
-                    // Fallback for plain text if any
-                    appendToLog('INFO', event.data);
-                }
-            }
-        };
+        connectWebSocket();
 
         // Send Microphone Audio to Backend
         processor.port.onmessage = (event) => {
-            if (isConnected && ws.readyState === WebSocket.OPEN) {
+            if (isConnected && ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(event.data);
             }
         };
@@ -308,11 +326,8 @@ connectBtn.onclick = async () => {
 
 disconnectBtn.onclick = () => {
     // Terminate Session Completely
+    shouldReconnect = false;
     if (ws) ws.close();
-    if (avatar) avatar.close();
-    if (audioContext) {
-        audioContext.close();
-    }
     statusDiv.textContent = 'SESSION TERMINATED';
     statusDiv.style.color = "var(--text-color)";
     appendToLog('SYSTEM', 'Session Terminated by User.');

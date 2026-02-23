@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dos Admin Panel</title>
+    <title>Панель Управления Dos</title>
     <style>
         body { font-family: 'Courier New', monospace; background: #1a1a1a; color: #0f0; margin: 0; padding: 20px; display: flex; height: 100vh; box-sizing: border-box; }
         .column { flex: 1; border: 1px solid #333; padding: 10px; display: flex; flex-direction: column; overflow: hidden; margin: 0 5px; background: #222; }
@@ -29,44 +29,44 @@
 </head>
 <body>
     <div class="column">
-        <h2>Live Logs</h2>
+        <h2>Живые Логи</h2>
         <div id="logs" class="logs"></div>
     </div>
 
     <div class="column">
-        <h2>AI Control (Draft Mode)</h2>
-        <div class="status" id="connection-status">Disconnected</div>
+        <h2>Контроль ИИ (Режим Черновика)</h2>
+        <div class="status" id="connection-status">Отключено</div>
 
         <div class="control-panel">
-            <label>Current Draft (Plan):</label>
+            <label>Текущий Черновик (Мысли ИИ):</label>
             <textarea id="draft-text" readonly></textarea>
             <div style="display: flex; gap: 5px;">
-                <button class="approve" id="approve-btn" onclick="approveDraft()" disabled>Approve (Go Live)</button>
-                <button class="reject" id="reject-btn" onclick="rejectDraft()" disabled>Reject (Silence)</button>
+                <button class="approve" id="approve-btn" onclick="approveDraft()" disabled>Одобрить (Пустить в эфир)</button>
+                <button class="reject" id="reject-btn" onclick="rejectDraft()" disabled>Отклонить (Запретить говорить)</button>
             </div>
 
             <hr style="border-color: #333; width: 100%;">
 
-            <label>Change Course (Feedback):</label>
-            <textarea id="feedback-text" placeholder="e.g. Don't mention the release, talk about the team instead..."></textarea>
-            <button onclick="sendFeedback()">Regenerate Draft</button>
+            <label>Изменить направление (Обратная связь):</label>
+            <textarea id="feedback-text" placeholder="Например: Не упоминай релиз, скажи про команду..."></textarea>
+            <button onclick="sendFeedback()">Переписать черновик</button>
 
             <hr style="border-color: #333; width: 100%;">
 
-            <label>Manual Override (Direct Speak):</label>
-            <textarea id="manual-text" placeholder="Type exactly what you want Dos to say..."></textarea>
-            <button onclick="sendManual()">Speak This Text</button>
+            <label>Ручное управление (Сказать напрямую):</label>
+            <textarea id="manual-text" placeholder="Напишите точный текст, который должен произнести Дос..."></textarea>
+            <button onclick="sendManual()">Озвучить этот текст</button>
         </div>
     </div>
 
     <div class="column">
-        <h2>Emergency / Actions</h2>
+        <h2>Экстренные Действия</h2>
         <div class="control-panel">
-            <button onclick="triggerFiller()">Play Filler (Thinking...)</button>
-            <button onclick="compressContext()">Compress Context</button>
-            <button onclick="recoverSession()" style="background: #a50;">Recover / Reconnect</button>
+            <button onclick="triggerFiller()">Включить заглушку (Думаю...)</button>
+            <button onclick="compressContext()">Сжать контекст памяти</button>
+            <button onclick="recoverSession()" style="background: #a50;">Восстановить соединение</button>
             <div style="margin-top: 20px; font-size: 0.8em; color: #666;">
-                Status: <span id="server-status">Unknown</span>
+                Статус: <span id="server-status">Неизвестен</span>
             </div>
         </div>
     </div>
@@ -82,9 +82,9 @@
             const serverStatus = document.getElementById('server-status');
 
             ws.onopen = () => {
-                statusDiv.textContent = 'Connected';
+                statusDiv.textContent = 'Подключено';
                 statusDiv.style.color = '#0f0';
-                serverStatus.textContent = 'Online';
+                serverStatus.textContent = 'В сети';
             };
 
             ws.onmessage = (event) => {
@@ -126,9 +126,9 @@
             };
 
             ws.onclose = () => {
-                statusDiv.textContent = 'Disconnected (Retrying...)';
+                statusDiv.textContent = 'Отключено (Повтор...)';
                 statusDiv.style.color = '#f00';
-                serverStatus.textContent = 'Offline';
+                serverStatus.textContent = 'Офлайн';
                 setTimeout(connect, 2000);
             };
         }
