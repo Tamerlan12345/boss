@@ -111,14 +111,11 @@ class SpeakerIdentifier:
         if len(chunk_bytes) % 2 != 0:
             return None
 
-        # Convert bytes to float32
+        # Optimization: Store raw int16 data to avoid per-chunk float32 conversion
         int16_data = np.frombuffer(chunk_bytes, dtype=np.int16)
-        # Optimized: In-place division to avoid allocating second float array
-        float32_data = int16_data.astype(np.float32)
-        float32_data /= 32768.0
 
-        chunk_len = len(float32_data)
-        self.buffer.append(float32_data)
+        chunk_len = len(int16_data)
+        self.buffer.append(int16_data)
         self.buffer_sample_count += chunk_len
 
         # Keep buffer manageable (e.g. max 5 seconds)
@@ -146,11 +143,13 @@ class SpeakerIdentifier:
             # Since we collected from right to left, we need to reverse the list of chunks
             segment_chunks.reverse()
 
-            # Concatenate
+            # Concatenate int16 chunks
             full_segment = np.concatenate(segment_chunks)
 
-            # Take the exact last required_samples
-            segment = full_segment[-required_samples:]
+            # Take the exact last required_samples and convert to float32
+            # Perform division in-place on the new float32 array
+            segment = full_segment[-required_samples:].astype(np.float32)
+            segment /= 32768.0
 
             self.samples_processed = 0
             return segment
