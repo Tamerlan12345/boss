@@ -35,7 +35,7 @@ class SpeakerIdentifier:
                 self.encoder = None
 
     def load_speakers_from_folder(self, folder_path: str):
-        if not self.encoder or not os.path.exists(folder_path):
+        if not folder_path or not self.encoder or not os.path.exists(folder_path):
             return
 
         # Expects files like "Name.wav" or "Name.mp3"
