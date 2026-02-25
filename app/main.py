@@ -241,6 +241,12 @@ async def admin_websocket(websocket: WebSocket):
 
             except json.JSONDecodeError:
                 pass
+            except Exception as e:
+                logger.error(f"Error processing admin command: {e}")
+                try:
+                    await websocket.send_text(json.dumps({"type": "status", "message": f"Error: {str(e)}"}))
+                except:
+                    pass
     except WebSocketDisconnect:
         if websocket in session_manager.admin_websockets:
             session_manager.admin_websockets.remove(websocket)
