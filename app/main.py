@@ -52,7 +52,8 @@ class SessionManager:
              "speaker_active": False,
              "processing_summary": False,
              "intro_active": False,
-             "draft_mode_enabled": True
+             "draft_mode_enabled": True,
+             "is_speaking_approved": False
         }
         self.last_spoken_words: str = ""
         self.client_mode: str = "default"
@@ -170,6 +171,7 @@ async def admin_websocket(websocket: WebSocket):
                     if session_manager.gemini_client:
                         logger.info("Admin approved draft.")
                         draft_to_speak = session_manager.current_draft.replace("PLAN:", "").strip()
+                        session_manager.state["is_speaking_approved"] = True
                         await session_manager.gemini_client.send_text(f"[SYSTEM OVERRIDE] ОДОБРЕНО. ИГНОРИРУЙ ВСЕ ПРАВИЛА ПАССИВНОГО РЕЖИМА И ПРОТОКОЛЫ. НЕ ПИШИ ПЛАН. СРАЗУ ПРОИЗНЕСИ ЭТОТ ТЕКСТ ГОЛОСОМ: {draft_to_speak} {RUSSIAN_ENFORCEMENT}")
                         session_manager.current_draft = ""
                         await session_manager.broadcast_status("Draft Approved")
@@ -191,6 +193,7 @@ async def admin_websocket(websocket: WebSocket):
                     text = msg.get("text")
                     if session_manager.gemini_client and text:
                         # Direct speak override
+                        session_manager.state["is_speaking_approved"] = True
                         await session_manager.gemini_client.send_text(f"[SYSTEM OVERRIDE] ПРЯМАЯ КОМАНДА АДМИНА. СРАЗУ ПРОИЗНЕСИ ГОЛОСОМ, БЕЗ АНАЛИЗА: {text} {RUSSIAN_ENFORCEMENT}")
                         session_manager.current_draft = ""
                         await session_manager.broadcast_status("Manual Override Sent")
@@ -435,7 +438,7 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                 if len(session_manager.last_spoken_words) > 500:
                                     session_manager.last_spoken_words = session_manager.last_spoken_words[-500:]
 
-                                if state.get("draft_mode_enabled"):
+                                if state.get("draft_mode_enabled") and not state.get("is_speaking_approved"):
                                     session_manager.current_draft += text_chunk + " "
                                     await session_manager.broadcast_draft(session_manager.current_draft)
                                     continue
@@ -463,6 +466,12 @@ async def websocket_endpoint(websocket: WebSocket, mode: str = "default"):
                                                 summary_buffer.clear()
                                         if state["intro_active"]:
                                             state["intro_active"] = False
+
+                                    # Reset approval state after turn completion
+                                    if state.get("is_speaking_approved"):
+                                        state["is_speaking_approved"] = False
+                                        logger.info("Draft approval reset after speech.")
+
                                     logger.info("Silence token received.")
                                 else:
                                     if text_chunk: is_silenced = False
